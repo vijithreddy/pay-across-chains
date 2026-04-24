@@ -28,6 +28,7 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
     queryKey: ["usdc-balance", chainId, address],
     enabled: !!address,
     refetchInterval: 10_000,
+    retry: 2,
     queryFn: async () => {
       if (!address) return 0n;
       const chain = chainMap[chainId as keyof typeof chainMap];
@@ -87,9 +88,7 @@ export function FundingChecklist({
       balance,
       required: MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].label,
       bridgeLink: BRIDGE_LINKS[chainId as keyof typeof BRIDGE_LINKS],
-      // Show loading while fetching, or if query hasn't returned data yet (no error)
-      loading: query.isLoading || query.isFetching || (query.data === undefined && !query.isError),
-      error: query.isError,
+      loading: query.isLoading,
     };
   });
 
@@ -153,8 +152,6 @@ export function FundingChecklist({
               <div className="flex items-center gap-3">
                 {s.loading ? (
                   <div className="h-4 w-20 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
-                ) : s.error ? (
-                  <span className="text-xs text-[var(--text-dim)]">RPC error</span>
                 ) : (
                   <>
                     <span className="font-mono text-sm text-white tabular-nums">
