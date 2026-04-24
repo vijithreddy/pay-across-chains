@@ -249,3 +249,14 @@ VERCEL_TOKEN
   max 6 decimal places, below wallet balance
 - RPC URLs are in env vars — never hardcoded in source
 - No secrets in CLAUDE.md, CHANGES.md or any committed file
+
+
+## Comment Rules
+- Every function/component: one-line comment above — WHAT and WHY
+- Non-obvious logic: inline comment on the same line
+- Chain gotchas: always comment with the reason not just the fix
+- No obvious comments restating the code
+- Every try/catch: comment what specifically can throw
+- Every Promise.allSettled: comment why not Promise.all
+- TODOs allowed in dev: format as // TODO: [what] [your initials]
+  but zero TODOs allowed before demo day

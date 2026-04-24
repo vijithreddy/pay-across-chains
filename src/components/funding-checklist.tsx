@@ -12,6 +12,7 @@ import {
   BRIDGE_LINKS,
   CHAIN_COLORS,
   CHAIN_NAMES,
+  CHAIN_BORDER_CLASSES,
   transports,
 } from "@/lib/chains";
 import { erc20Abi } from "@/lib/abi";
@@ -46,11 +47,6 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   });
 }
 
-const CHAIN_BORDER_CLASSES: Record<number, string> = {
-  [mainnet.id]: "chain-border-eth",
-  [base.id]: "chain-border-base",
-  [tempo.id]: "chain-border-tempo",
-};
 
 export function FundingChecklist({
   onAllFunded,

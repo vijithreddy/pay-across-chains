@@ -1,12 +1,9 @@
 "use client";
 
-import { CHAIN_COLORS, CHAIN_NAMES, EXPLORER_URLS, tempo } from "@/lib/chains";
+import { CHAIN_IDS, CHAIN_COLORS, CHAIN_NAMES, EXPLORER_URLS, tempo } from "@/lib/chains";
 import type { ChainRaceState } from "@/lib/race-engine";
-import { mainnet, base } from "wagmi/chains";
 import { ExternalLink, Copy, Check } from "lucide-react";
 import { useState } from "react";
-
-const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
 
 function CopyHash({ hash }: { hash: string }) {
   const [copied, setCopied] = useState(false);

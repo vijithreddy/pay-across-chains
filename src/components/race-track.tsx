@@ -1,17 +1,8 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CHAIN_COLORS, CHAIN_NAMES } from "@/lib/chains";
+import { CHAIN_IDS, CHAIN_COLORS, CHAIN_NAMES, CHAIN_INITIALS } from "@/lib/chains";
 import type { ChainRaceState, TxState } from "@/lib/race-engine";
-import { mainnet, base } from "wagmi/chains";
-import { tempo } from "viem/chains";
-
-const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
-const CHAIN_INITIALS: Record<number, string> = {
-  [mainnet.id]: "E",
-  [base.id]: "B",
-  [tempo.id]: "T",
-};
 
 const VIEWBOX_W = 860;
 const VIEWBOX_H = 300;

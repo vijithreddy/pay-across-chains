@@ -13,8 +13,7 @@ import { Zap } from "lucide-react";
 import { mainnet, base } from "wagmi/chains";
 import { tempo } from "viem/chains";
 import type { ChainRaceState } from "@/lib/race-engine";
-
-type Tab = "race" | "migration";
+import type { Tab } from "@/types";
 
 // Idle states for the hero preview track
 function makeIdleStates(): Record<number, ChainRaceState> {

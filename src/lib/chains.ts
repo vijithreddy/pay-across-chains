@@ -55,3 +55,17 @@ export const CHAIN_NAMES = {
   [base.id]: "Base",
   [tempo.id]: "Tempo",
 } as const;
+
+export const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
+
+export const CHAIN_INITIALS: Record<number, string> = {
+  [mainnet.id]: "E",
+  [base.id]: "B",
+  [tempo.id]: "T",
+};
+
+export const CHAIN_BORDER_CLASSES: Record<number, string> = {
+  [mainnet.id]: "chain-border-eth",
+  [base.id]: "chain-border-base",
+  [tempo.id]: "chain-border-tempo",
+};

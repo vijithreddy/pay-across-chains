@@ -2,17 +2,9 @@
 
 import { useState } from "react";
 import { Check, Copy } from "lucide-react";
+import type { MigrationCard } from "@/types";
 
-type Card = {
-  title: string;
-  description: string;
-  evmCode: string;
-  tempoCode: string;
-  evmHighlight: number[];
-  tempoHighlight: number[];
-};
-
-const cards: Card[] = [
+const cards: MigrationCard[] = [
   {
     title: "Balance Check",
     description: "eth_getBalance returns a dummy value on Tempo. Always use token.balanceOf() instead.",

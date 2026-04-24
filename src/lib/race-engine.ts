@@ -4,6 +4,9 @@ import {
   formatEther,
   type Hash,
   type TransactionReceipt,
+  type WalletClient,
+  type Transport,
+  type Account,
 } from "viem";
 import { writeContract, switchChain } from "@wagmi/core";
 import { mainnet, base } from "wagmi/chains";
@@ -14,6 +17,11 @@ import { erc20Abi } from "./abi";
 import { config } from "./wagmi";
 
 type SupportedChainId = typeof mainnet.id | typeof base.id | typeof tempo.id;
+import type { Chain } from "viem";
+
+// Accepts any tempo-compatible wallet client — provider uses base tempo chain,
+// we use extended chain (with feeToken), both are structurally compatible
+type TempoWalletClient = WalletClient<Transport, Chain, Account>;
 
 export type TxState =
   | "idle"
@@ -41,7 +49,7 @@ type RaceParams = {
   recipient: `0x${string}`;
   amount: string;
   memo: string;
-  tempoClient?: any; // viem Client from Tempo Wallet provider
+  tempoClient?: TempoWalletClient;
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
 
@@ -65,7 +73,7 @@ async function signChain(
   recipient: `0x${string}`,
   amount: bigint,
   memo: string,
-  tempoClient: any,
+  tempoClient: TempoWalletClient | undefined,
   onUpdate: RaceParams["onUpdate"]
 ): Promise<{ hash: Hash; broadcastTime: number }> {
   onUpdate(chainId, { state: "signing" });
@@ -73,7 +81,8 @@ async function signChain(
   if (chainId !== tempo.id) {
     // Switch MetaMask to the target chain (not needed for Tempo — separate wallet)
     try {
-      await switchChain(config, { chainId } as any);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wagmi v2 types don't infer extended chain IDs
+      await (switchChain as Function)(config, { chainId });
     } catch {
       // May throw if already on the correct chain, ignore
     }
@@ -85,20 +94,22 @@ async function signChain(
     // Use the Tempo SDK's native token.transfer via the Tempo Wallet client
     // (separate from wagmi — Tempo Wallet handles type 0x76 signing)
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
-    hash = await Actions.token.transfer(tempoClient as any, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- viem/tempo Actions type expects a broader Client type
+    hash = await (Actions.token.transfer as Function)(tempoClient, {
       to: recipient,
       amount,
       memo: Hex.fromString(memo),
       token: USDC_ADDRESSES[tempo.id],
-    } as any);
+    });
   } else {
-    hash = await writeContract(config, {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wagmi v2 types don't infer extended chain IDs
+    hash = await (writeContract as Function)(config, {
       chainId,
       address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
       abi: erc20Abi,
       functionName: "transfer",
       args: [recipient, amount],
-    } as any);
+    });
   }
 
   const broadcastTime = performance.now();
