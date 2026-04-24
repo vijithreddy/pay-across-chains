@@ -13,6 +13,7 @@ const RUNNER_TRAVEL = FINISH_X - START_X;
 const LANE_H = 80;
 const LANE_Y = [60, 140, 220] as const;
 
+/** Maps tx state to runner X position on the track (0=start, FINISH_X=end) */
 function getTargetX(state: TxState): number {
   switch (state) {
     case "idle":
@@ -28,12 +29,14 @@ function getTargetX(state: TxState): number {
   }
 }
 
+/** Returns Framer Motion transition config — slow crawl while racing, spring snap on confirm */
 function getTransition(state: TxState) {
   if (state === "racing") return { duration: 45, ease: "linear" as const };
   if (state === "confirmed") return { type: "spring" as const, stiffness: 200, damping: 22, mass: 0.8 };
   return { type: "spring" as const, stiffness: 80, damping: 20 };
 }
 
+/** Animated stick-figure runner with chain-initial head — legs/arms cycle while racing */
 function RunnerFigure({
   color,
   initial,
@@ -125,6 +128,7 @@ function RunnerFigure({
   );
 }
 
+/** SVG 3-lane race track with animated runners — position driven by real tx state */
 export function RaceTrack({
   chainStates,
 }: {

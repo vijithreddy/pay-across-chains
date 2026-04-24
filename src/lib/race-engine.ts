@@ -53,6 +53,7 @@ type RaceParams = {
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
 
+/** Creates a read-only viem client for the given chain — used for waitForTransactionReceipt */
 function getPublicClient(chainId: number) {
   const chainMap = {
     [mainnet.id]: mainnet,
@@ -128,6 +129,7 @@ async function raceConfirmation(
   onUpdate(chainId, { state: "racing", startTime: raceStart });
 
   try {
+    // Can fail if: RPC is down, tx reverts, or receipt polling times out
     const publicClient = getPublicClient(chainId);
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     const endTime = performance.now();
@@ -175,6 +177,7 @@ async function raceConfirmation(
   }
 }
 
+/** Orchestrates the full 3-chain race: sequential signing then parallel confirmation */
 export async function startRace(
   params: RaceParams & { account: `0x${string}` }
 ): Promise<ChainRaceState[]> {
@@ -213,6 +216,7 @@ export async function startRace(
   // Each chain's timer starts from its broadcast moment (when the hash was received).
   // This gives honest per-chain latency — Eth/Base don't show 0.1s just because
   // they confirmed while the user was still signing Tempo.
+  // allSettled (not all) so one chain failing doesn't kill the others' results
   const results = await Promise.allSettled(
     signOrder.map((chainId) => {
       const { hash, broadcastTime } = signed[chainId]!;
@@ -254,6 +258,7 @@ const MOCK_HASHES: Record<number, Hash> = {
   [tempo.id]: "0xccc3333333333333333333333333333333333333333333333333333333333333" as Hash,
 };
 
+/** Mock race with simulated timing — no real transactions, logs what calls would look like */
 export async function startDryRace(
   params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate">
 ): Promise<ChainRaceState[]> {

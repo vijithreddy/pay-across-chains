@@ -55,6 +55,7 @@ const cards: MigrationCard[] = [
   },
 ];
 
+/** Copy-to-clipboard button for code blocks */
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
@@ -76,6 +77,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+/** Side-by-side code comparison block — EVM (red) vs Tempo (green) with line highlights */
 function CodeBlock({
   code,
   highlights,
@@ -130,6 +132,7 @@ function CodeBlock({
   );
 }
 
+/** 6 EVM-to-Tempo migration pattern cards showing before/after code */
 export function MigrationCards() {
   return (
     <div className="space-y-4">

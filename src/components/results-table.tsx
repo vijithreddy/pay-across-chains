@@ -5,6 +5,7 @@ import type { ChainRaceState } from "@/lib/race-engine";
 import { ExternalLink, Copy, Check } from "lucide-react";
 import { useState } from "react";
 
+/** Truncated tx hash with click-to-copy — shows 0x1234...abcd format */
 function CopyHash({ hash }: { hash: string }) {
   const [copied, setCopied] = useState(false);
   const short = `${hash.slice(0, 6)}...${hash.slice(-4)}`;
@@ -23,6 +24,7 @@ function CopyHash({ hash }: { hash: string }) {
   );
 }
 
+/** Small colored badge pill for status indicators (FUNDED, WINNER, Native, etc.) */
 function Pill({ children, color }: { children: React.ReactNode; color: string }) {
   return (
     <span
@@ -38,6 +40,7 @@ function Pill({ children, color }: { children: React.ReactNode; color: string })
   );
 }
 
+/** Terminal-style comparison table — time, fee, finality, memo per chain with explorer links */
 export function ResultsTable({
   chainStates,
 }: {

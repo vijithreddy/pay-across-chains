@@ -3,6 +3,7 @@
 import { useTempoWallet } from "./tempo-provider";
 import { Loader2 } from "lucide-react";
 
+/** Tempo Wallet sign-in/disconnect button — separate from MetaMask/RainbowKit */
 export function TempoConnect() {
   const { address, signIn, signOut, isPending } = useTempoWallet();
 
@@ -28,7 +29,7 @@ export function TempoConnect() {
             </div>
             <button
               onClick={(e) => {
-                e.stopPropagation();
+                e.stopPropagation(); // Prevent parent div click from triggering signOut
                 navigator.clipboard.writeText(address);
               }}
               title="Click to copy"

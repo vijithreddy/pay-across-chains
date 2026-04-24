@@ -18,6 +18,7 @@ import {
 import { erc20Abi } from "@/lib/abi";
 import { ExternalLink } from "lucide-react";
 
+/** Reads USDC balance via balanceOf for any chain — Tempo: NEVER use eth_getBalance (returns dummy) */
 function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   const chainMap = {
     [mainnet.id]: mainnet,
@@ -48,6 +49,7 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
 }
 
 
+/** Shows USDC balance per chain with FUNDED/NOT FUNDED badges — gates the race start */
 export function FundingChecklist({
   onAllFunded,
   tempoAddress,

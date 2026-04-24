@@ -184,17 +184,27 @@ Dark financial terminal meets F1 race telemetry.
 - src/lib/abi.ts — ERC-20 ABI + TIP-20 ABI from viem/tempo
 - src/components/tempo-provider.tsx — accounts SDK Provider + WalletClient context
 - src/components/tempo-connect.tsx — Tempo sign-in button
-- src/components/race-form.tsx — payment form, signing status, live timers
+- src/components/race-form.tsx — payment form + race orchestration
+- src/components/signing-status.tsx — signing phase UI per chain
+- src/components/live-timer.tsx — animated 00:00.48 timer
+- src/components/status-cards.tsx — per-chain confirmation cards
 - src/components/race-track.tsx — SVG track with animated stick-figure runners
 - src/components/results-table.tsx — terminal-style results with pill badges
 - src/components/funding-checklist.tsx — balance checks with chain-colored borders
 - src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
+- src/types/index.ts — shared types (Tab, MigrationCard)
 - evals/regression.eval.ts — 43-check regression suite (run before any changes)
 
 ## Regression Evals
 Run before any code change: `npx tsx evals/regression.eval.ts`
 43 checks covering: architecture, signing flow, dual-connection isolation,
 hydration guards, timing, funding, UI components, file existence, TypeScript build.
+
+Full suite (71 checks): run all 4 eval files:
+- evals/regression.eval.ts (43 checks)
+- evals/signing-flow.eval.ts (10 checks)
+- evals/dual-connection.eval.ts (14 checks)
+- evals/hydration.eval.ts (4 checks)
 
 ## Environment Variables
 NEXT_PUBLIC_ETH_RPC
@@ -260,3 +270,7 @@ VERCEL_TOKEN
 - Every Promise.allSettled: comment why not Promise.all
 - TODOs allowed in dev: format as // TODO: [what] [your initials]
   but zero TODOs allowed before demo day
+  - Multi-return components: comment each return block with 
+  // State 1: / State 2: / State 3: describing the condition
+- stopPropagation and preventDefault: always comment why
+- Any slice/substring on an address: comment the display convention

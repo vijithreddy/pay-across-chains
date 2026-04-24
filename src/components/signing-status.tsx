@@ -4,6 +4,7 @@ import { CHAIN_IDS, CHAIN_NAMES, CHAIN_COLORS, CHAIN_BORDER_CLASSES } from "@/li
 import type { ChainRaceState } from "@/lib/race-engine";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
+/** Shows per-chain signing progress during the wallet prompt phase */
 export function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceState> }) {
   return (
     <div className="space-y-2 border border-[var(--border)] rounded-sm bg-[var(--bg-surface)] p-4">

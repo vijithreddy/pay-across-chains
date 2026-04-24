@@ -24,6 +24,7 @@ function makeIdleStates(): Record<number, ChainRaceState> {
   };
 }
 
+/** Main app page — routes between hero, funding checklist, race screen, and migration cards */
 export default function Home() {
   const { isConnected } = useAccount();
   const { address: tempoAddress } = useTempoWallet();

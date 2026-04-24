@@ -13,14 +13,7 @@ import { Provider, dialog, Dialog } from "accounts";
 import { createWalletClient, custom } from "viem";
 import { tempo } from "viem/chains";
 import type { WalletClient, Transport, Account } from "viem";
-
-type TempoCtx = {
-  address: `0x${string}` | undefined;
-  client: WalletClient<Transport, typeof tempo, Account> | undefined;
-  signIn: () => Promise<void>;
-  signOut: () => void;
-  isPending: boolean;
-};
+import type { TempoCtx } from "@/types";
 
 const TempoContext = createContext<TempoCtx>({
   address: undefined,
@@ -30,10 +23,12 @@ const TempoContext = createContext<TempoCtx>({
   isPending: false,
 });
 
+/** Hook to access Tempo Wallet state — address, client, signIn, signOut */
 export function useTempoWallet() {
   return useContext(TempoContext);
 }
 
+/** Manages Tempo Wallet connection via accounts SDK — independent from wagmi/MetaMask */
 export function TempoProvider({ children }: { children: ReactNode }) {
   const providerRef = useRef<ReturnType<typeof Provider.create>>(undefined);
   const [address, setAddress] = useState<`0x${string}`>();
@@ -83,7 +78,7 @@ export function TempoProvider({ children }: { children: ReactNode }) {
           handleAccountsChanged(accounts);
         }
       })
-      .catch(() => {});
+      .catch(() => {}); // Silent — no stored session is normal on first visit
 
     return () => {
       provider.removeListener("accountsChanged", handleAccountsChanged);
@@ -119,7 +114,7 @@ export function TempoProvider({ children }: { children: ReactNode }) {
     if (!providerRef.current) return;
     providerRef.current
       .request({ method: "wallet_disconnect" })
-      .catch(() => {});
+      .catch(() => {}); // Best-effort disconnect — UI resets regardless
     setAddress(undefined);
     setClient(undefined);
   }, []);
