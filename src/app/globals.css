@@ -74,8 +74,8 @@
   --success: #10B981;
   --warning: #F59E0B;
   --text-primary: #F1F5F9;
-  --text-secondary: #64748B;
-  --text-dim: #334155;
+  --text-secondary: #94A3B8;
+  --text-dim: #64748B;
 
   /* Shadcn overrides */
   --background: #080B0F;
@@ -89,7 +89,7 @@
   --secondary: #161C26;
   --secondary-foreground: #F1F5F9;
   --muted: #161C26;
-  --muted-foreground: #64748B;
+  --muted-foreground: #94A3B8;
   --accent: #161C26;
   --accent-foreground: #F1F5F9;
   --destructive: #EF4444;

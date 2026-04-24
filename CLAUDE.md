@@ -8,100 +8,147 @@ mainnet simultaneously. Tempo wins in ~500ms. Real transactions, real fees,
 real explorer links. Built for a Tempo Solutions Engineer interview.
 
 ## User Flow
-1. Land on app → hero screen with Connect Wallet button
-2. User connects wallet via RainbowKit ConnectButton
-3. App reads connected wallet balances on all 3 chains simultaneously:
-   - ETH on Ethereum via eth_getBalance
-   - ETH on Base via eth_getBalance
-   - USDC on Tempo via token.balanceOf — NEVER eth_getBalance on Tempo
-4. Funding checklist with green/red per chain:
-   - Ethereum: need ≥ 0.005 ETH
-   - Base: need ≥ 0.0001 ETH
-   - Tempo: need ≥ 5 USDC
-   - If red: show bridge link
-5. All green → "Start the Race" button activates
-6. Pre-filled race form:
-   - Recipient: any valid address (pre-fill for demo)
+1. Land on app → split hero: intro left, idle race track preview right
+2. User connects MetaMask via RainbowKit ConnectButton
+3. User signs in to Tempo Wallet via accounts SDK embedded dialog
+4. Funding checklist reads USDC balances on all 3 chains via token.balanceOf:
+   - Ethereum: need ≥ 1 USDC (gas paid in ETH separately)
+   - Base: need ≥ 1 USDC (gas paid in ETH separately)
+   - Tempo: need ≥ 1.5 USDC (covers transfer + USDC gas fee)
+5. All green + both wallets connected → "START THE RACE →" button
+6. Race screen with compact payment form:
+   - Recipient: any valid address
    - Amount: 1 USDC
-   - Memo: "Invoice #1042 — Demo Payment"
-7. "Send on All Three" → fires all 3 transactions simultaneously
-8. SVG 3-lane track animates, runners move on real tx state
-9. Tempo confirms (~500ms) → confetti, timer freezes, green flash
-10. Base confirms (~3s), Ethereum confirms (~45s)
-11. Results table: time, fee, fee token, finality, memo — with explorer links
+   - Memo: "Invoice #1042 — Demo Payment" (Tempo exclusive)
+7. "SEND ON ALL THREE" → sequential signing:
+   - Ethereum: MetaMask prompt (writeContract, ERC-20 transfer)
+   - Base: MetaMask prompt (writeContract, ERC-20 transfer)
+   - Tempo: Tempo Wallet dialog (Actions.token.transfer, native type 0x76)
+8. All 3 signed → race phase: Promise.allSettled waitForTransactionReceipt
+9. SVG 3-lane track animates, runners move on real tx state
+10. Tempo confirms (~500ms) → confetti, timer freezes, victory pose
+11. Base confirms (~3s), Ethereum confirms (~45s)
+12. Results table: time, fee, fee token, finality, memo — with explorer links
 
-## Wallet Architecture
-- Connected wallet is the SIGNER for all 3 chains
-- Same address, same key, different chain context
-- Wagmi handles chain switching automatically
-- No private keys in env vars
-- No hardcoded recipient — pre-fill the form field only
+## Dual-Wallet Architecture
+Two separate wallet connections — NOT the same address:
+- **MetaMask** (via RainbowKit/wagmi): signs Ethereum + Base ERC-20 transfers
+- **Tempo Wallet** (via accounts SDK): signs native Tempo type 0x76 transfers
 
-## Wagmi + RainbowKit v2 Config
+Why two wallets:
+- MetaMask cannot sign Tempo's custom tx type (0x76)
+- Tempo Wallet uses WebAuthn/passkeys — signing via embedded dialog
+- wagmi manages MetaMask; accounts SDK manages Tempo independently
+
+Critical config:
+- `multiInjectedProviderDiscovery: false` in wagmi config — prevents
+  accounts SDK's EIP-6963 announcement from hijacking MetaMask connection
+- TempoProvider uses React context, NOT wagmi hooks — zero cross-contamination
+
+## Wagmi Config (MetaMask / Eth+Base)
+```
 // src/lib/wagmi.ts
-import { getDefaultConfig } from '@rainbow-me/rainbowkit'
-import { mainnet, base } from 'wagmi/chains'
-import { defineChain, http } from 'viem'
+import { createConfig, http } from "wagmi"
+import { connectorsForWallets } from "@rainbow-me/rainbowkit"
+import { metaMaskWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets"
 
-const tempo = defineChain({
-  id: TEMPO_CHAIN_ID,
-  name: 'Tempo',
-  nativeCurrency: { name: 'USD', symbol: 'USD', decimals: 18 },
-  rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_TEMPO_RPC!] }
-  }
-})
+const connectors = connectorsForWallets([...], { appName, projectId })
 
-export const config = getDefaultConfig({
-  appName: 'Pay Across Chains',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!,
+createConfig({
   chains: [mainnet, base, tempo],
-  transports: {
-    [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC),
-    [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC),
-    [tempo.id]: http(process.env.NEXT_PUBLIC_TEMPO_RPC),
-  }
+  connectors,
+  multiInjectedProviderDiscovery: false,  // CRITICAL
+  transports: { ... },
 })
+```
+
+## Tempo Wallet Config (accounts SDK)
+```
+// src/components/tempo-provider.tsx
+import { Provider, dialog, Dialog } from "accounts"
+import { createWalletClient, custom } from "viem"
+
+// Create provider with iframe (HTTPS) or popup (localhost)
+Provider.create({
+  adapter: dialog({ dialog: isLocalhost ? Dialog.popup() : Dialog.iframe() }),
+  chains: [tempo],
+})
+
+// Build wallet client with JSON-RPC account (NOT getAccount signable)
+// Dialog handles signing — app never has the private key
+createWalletClient({
+  account: address,  // just the address, not a signable account
+  chain: tempo,
+  transport: custom(provider),
+})
+```
 
 ## Provider Wrap Order in layout.tsx
-QueryClientProvider → WagmiProvider → RainbowKitProvider
+WagmiProvider → QueryClientProvider → RainbowKitProvider → TempoProvider
 
-## Race Track Visual
-- SVG 3-lane track, top half of race screen
-- Lane 1: Ethereum — #627EEA
-- Lane 2: Base — #0052FF
-- Lane 3: Tempo — #7C3AED
-- Runner position from real tx state, not fake timer
-- Framer Motion for animation
-- canvas-confetti on Tempo win
-- Timer freezes on confirmation, others keep moving
+## Tempo Chain Config
+```
+// src/lib/chains.ts
+import { tempo as tempoBase } from "viem/chains"
+
+// extend() sets feeToken — triggers Tempo tx type (0x76) serialization
+export const tempo = tempoBase.extend({
+  feeToken: process.env.NEXT_PUBLIC_USDC_TEMPO as `0x${string}`,
+})
+```
+
+## Race Engine — Two Phases
+Phase 1 — Sequential signing (one wallet prompt at a time):
+- Ethereum: wagmi writeContract → MetaMask prompt → hash + broadcastTime
+- Base: wagmi writeContract → MetaMask prompt → hash + broadcastTime
+- Tempo: Actions.token.transfer → Tempo Wallet dialog → hash + broadcastTime
+
+Phase 2 — Simultaneous confirmation race:
+- Promise.allSettled → waitForTransactionReceipt for all 3
+- Each chain's elapsed time measured from its own broadcastTime
+- This gives honest per-chain latency
 
 ## Transaction Details
-- Ethereum: standard ERC-20 USDC transfer
-- Base: standard ERC-20 USDC transfer
-- Tempo: TIP-20 transfer WITH memo field
-- All 3 via Promise.allSettled simultaneously
-- Pull actual fee from receipt, show real dollar amount
+- Ethereum: standard ERC-20 USDC transfer via wagmi writeContract
+- Base: standard ERC-20 USDC transfer via wagmi writeContract
+- Tempo: Actions.token.transfer from viem/tempo — native type 0x76, with memo
+- Fee calculation: gasUsed * effectiveGasPrice, formatEther for all chains
+
+## Dry Race Mode
+Add `?dry` to URL to skip wallet connection and run with mock timing:
+- Tempo: 480ms, Base: 2800ms, Ethereum: 44000ms
+- Console logs show what real tx calls would look like
+- startDryRace() in race-engine.ts
 
 ## Results Table
 | | Ethereum | Base | Tempo |
 |---|---|---|---|
 | Time | real ms | real ms | real ms |
 | Fee | real ETH | real ETH | real USDC |
-| Fee token | ETH | ETH | USDC ✅ |
-| Finality | ~12 min | 7-day window | Instant ✅ |
-| Memo | ❌ | ❌ | Native ✅ |
+| Fee token | ETH | ETH | USDC (same token!) |
+| Finality | ~12 min | 7-day window | Instant |
+| Memo | N/A | N/A | Native |
 Explorer links: Etherscan, Basescan, explore.tempo.xyz
 
 ## Tab 2 — Migration Cards
-6 hardcoded before/after cards. EVM left, Tempo right. Changed lines
-highlighted. One line explanation. Copy button per block.
+6 hardcoded before/after cards. EVM left (red tint), Tempo right (green tint).
+Changed lines highlighted with 3px left bar. One line explanation. Copy button.
 1. Balance check: eth_getBalance → token.balanceOf
 2. Transfer with memo: ERC-20 → TIP-20 + memo
 3. Fee token: ETH hardcoded → any stablecoin
 4. Gas estimation: 20k → 250k new storage slot
 5. Finality: probabilistic → deterministic
 6. CALLVALUE: remove payable patterns entirely
+
+## Design System
+Dark financial terminal meets F1 race telemetry.
+- Fonts: DM Mono (display), Sora (body), JetBrains Mono (code)
+- Colors: CSS variables in globals.css (--bg-base, --eth-primary, etc.)
+- All surfaces: --bg-base/#080B0F, --bg-surface/#0E1218, --bg-raised/#161C26
+- Borders: 1px, --border/#1E2733, rounded-sm everywhere
+- Chain-colored 4px left borders on funding rows and status cards
+- No white backgrounds. No rounded-full or rounded-2xl.
+- Timer format: 00:00.48 monospace tabular-nums
 
 ## Tempo Key Facts
 - No native gas token — fees in USDC automatically
@@ -111,12 +158,15 @@ highlighted. One line explanation. Copy button per block.
 - BALANCE/SELFBALANCE opcodes return 0 — use token.balanceOf
 - CALLVALUE returns 0 — remove all payable patterns
 - New account creation: 250,000 gas vs 0 on Ethereum
+- WebAuthn requires valid TLS — use Dialog.popup() on localhost
 
 ## Tech Stack
-- Next.js 14 App Router
+- Next.js 16.2.4 App Router (Turbopack)
 - Viem ^2.48.4
-- Wagmi ^2.19.5
+- Wagmi ^2.19.5 (v2 — NOT v3)
 - RainbowKit ^2.2.10
+- accounts SDK ^0.8.1 (Tempo Wallet — NOT through wagmi)
+- ox (Hex utilities)
 - TanStack Query
 - Framer Motion
 - canvas-confetti
@@ -125,7 +175,26 @@ highlighted. One line explanation. Copy button per block.
 ## Chains — ALL MAINNET
 - Ethereum: chainId 1
 - Base: chainId 8453
-- Tempo: get chainId from MCP on first run
+- Tempo: chainId 4217
+
+## Key Files
+- src/lib/wagmi.ts — wagmi config with RainbowKit connectors
+- src/lib/chains.ts — chain definitions, feeToken, USDC addresses
+- src/lib/race-engine.ts — startRace, startDryRace, signChain, raceConfirmation
+- src/lib/abi.ts — ERC-20 ABI + TIP-20 ABI from viem/tempo
+- src/components/tempo-provider.tsx — accounts SDK Provider + WalletClient context
+- src/components/tempo-connect.tsx — Tempo sign-in button
+- src/components/race-form.tsx — payment form, signing status, live timers
+- src/components/race-track.tsx — SVG track with animated stick-figure runners
+- src/components/results-table.tsx — terminal-style results with pill badges
+- src/components/funding-checklist.tsx — balance checks with chain-colored borders
+- src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
+- evals/regression.eval.ts — 43-check regression suite (run before any changes)
+
+## Regression Evals
+Run before any code change: `npx tsx evals/regression.eval.ts`
+43 checks covering: architecture, signing flow, dual-connection isolation,
+hydration guards, timing, funding, UI components, file existence, TypeScript build.
 
 ## Environment Variables
 NEXT_PUBLIC_ETH_RPC
@@ -140,7 +209,11 @@ VERCEL_TOKEN
 ## Session Rules
 - Start every session: read CLAUDE.md and CHANGES.md
 - End every session: run /summarize
+- Before any code change: run `npx tsx evals/regression.eval.ts`
 - Never use testnet
 - Never use eth_getBalance on Tempo
 - Never hardcode gas limits
+- Never use getAccount({ signable: true }) for Tempo — dialog handles signing
+- Never put tempoWallet connector in wagmi config — use accounts SDK directly
+- Never set multiInjectedProviderDiscovery to true — breaks dual wallet
 - Never stop mid-build to ask for confirmation — just build

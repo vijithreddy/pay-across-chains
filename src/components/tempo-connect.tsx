@@ -26,9 +26,16 @@ export function TempoConnect() {
             <div className="text-xs font-mono uppercase tracking-wider text-[var(--text-primary)]">
               Tempo Wallet
             </div>
-            <div className="text-[10px] font-mono text-[var(--text-dim)]">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(address);
+              }}
+              title="Click to copy"
+              className="text-[10px] font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+            >
               {address.slice(0, 6)}...{address.slice(-4)}
-            </div>
+            </button>
           </div>
         </div>
         <button

@@ -59,7 +59,13 @@ export default function Home() {
           {!showHero && (
             <div className="flex items-center gap-3">
               {mounted && tempoAddress && (
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)] bg-[var(--tempo-dim)]">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(tempoAddress);
+                  }}
+                  title="Click to copy address"
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)] bg-[var(--tempo-dim)] hover:bg-[var(--tempo-primary)]/15 transition-colors cursor-pointer"
+                >
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--tempo-primary)] opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--tempo-primary)]" />
@@ -67,10 +73,10 @@ export default function Home() {
                   <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-bright)]">
                     Tempo
                   </span>
-                  <span className="font-mono text-[10px] text-[var(--text-dim)]">
+                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">
                     {tempoAddress.slice(0, 6)}...{tempoAddress.slice(-4)}
                   </span>
-                </div>
+                </button>
               )}
               <ConnectButton
                 showBalance={false}
