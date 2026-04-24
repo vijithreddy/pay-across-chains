@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount } from "wagmi";
 import { FundingChecklist } from "@/components/funding-checklist";
@@ -30,15 +30,14 @@ export default function Home() {
   const [allFunded, setAllFunded] = useState(false);
   const [raceStarted, setRaceStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("race");
-  const [mounted, setMounted] = useState(false);
-  const [dryRun, setDryRun] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    if (typeof window !== "undefined" && window.location.search.includes("dry")) {
-      setDryRun(true);
-    }
-  }, []);
+  // useSyncExternalStore avoids the cascading setState-in-useEffect pattern.
+  // Returns false on server, true on client — no double render.
+  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const dryRun = useSyncExternalStore(
+    () => () => {},
+    () => typeof window !== "undefined" && window.location.search.includes("dry"),
+    () => false
+  );
 
   const bothConnected = isConnected && !!tempoAddress;
   const showHero = !mounted || (!isConnected && !dryRun);
