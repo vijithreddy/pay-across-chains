@@ -91,6 +91,20 @@ checks.push({ name: "funding: checklist accepts tempoAddress prop", pass: fundin
 checks.push({ name: "funding: page passes tempoAddress to FundingChecklist", pass: page.includes("tempoAddress={tempoAddress}") || page.includes("tempoAddress=") });
 
 // =====================================================
+// 5b. BALANCE DISPLAY — handles loading, error, and data states
+// =====================================================
+checks.push({
+  name: "funding: handles isError state",
+  pass: fundingChecklist.includes("isError") || fundingChecklist.includes("error"),
+  detail: "Must show error state when RPC fails, not blank",
+});
+checks.push({
+  name: "funding: handles isFetching in loading state",
+  pass: fundingChecklist.includes("isFetching"),
+  detail: "isLoading alone misses refetch states",
+});
+
+// =====================================================
 // 6. UI — both connect buttons present
 // =====================================================
 checks.push({ name: "ui: page uses RainbowKit ConnectButton", pass: page.includes("ConnectButton") });
