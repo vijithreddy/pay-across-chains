@@ -44,7 +44,7 @@ function Pill({
 }) {
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase border"
+      className="inline-flex items-center px-2 py-0.5 rounded-xl text-[10px] font-mono uppercase border"
       style={{
         color,
         backgroundColor: `${color}10`,
@@ -82,7 +82,7 @@ export function ResultsTable({
   );
 
   return (
-    <div className="w-full overflow-hidden rounded-sm border border-[var(--border)] bg-[var(--bg-surface)]">
+    <div className="w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
       <div className="px-4 py-3 border-b border-[var(--border)]">
         <h3 className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">
           Race Results

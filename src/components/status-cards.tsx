@@ -25,7 +25,7 @@ export function StatusCards({
         return (
           <div
             key={id}
-            className={`${CHAIN_BORDER_CLASSES[id]} rounded-sm border bg-[var(--bg-surface)] px-3 py-3 transition-all ${
+            className={`${CHAIN_BORDER_CLASSES[id]} rounded-xl border bg-[var(--bg-surface)] px-3 py-3 transition-all ${
               isConfirmed
                 ? "border-[var(--success)]/30"
                 : "border-[var(--border)]"

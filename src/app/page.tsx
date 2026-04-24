@@ -7,22 +7,9 @@ import { FundingChecklist } from "@/components/funding-checklist";
 import { RaceForm } from "@/components/race-form";
 import { MigrationCards } from "@/components/migration-cards";
 import { TempoConnect } from "@/components/tempo-connect";
-import { RaceTrack } from "@/components/race-track";
 import { useTempoWallet } from "@/components/tempo-provider";
 import { Zap } from "lucide-react";
-import { mainnet, base } from "wagmi/chains";
-import { tempo } from "viem/chains";
-import type { ChainRaceState } from "@/lib/race-engine";
 import type { Tab } from "@/types";
-
-// Idle states for the hero preview track
-function makeIdleStates(): Record<number, ChainRaceState> {
-  return {
-    [mainnet.id]: { chainId: mainnet.id, name: "Ethereum", state: "idle" },
-    [base.id]: { chainId: base.id, name: "Base", state: "idle" },
-    [tempo.id]: { chainId: tempo.id, name: "Tempo", state: "idle" },
-  };
-}
 
 /** Main app page — routes between hero, funding checklist, race screen, and migration cards */
 export default function Home() {
@@ -31,8 +18,7 @@ export default function Home() {
   const [allFunded, setAllFunded] = useState(false);
   const [raceStarted, setRaceStarted] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("race");
-  // useSyncExternalStore avoids the cascading setState-in-useEffect pattern.
-  // Returns false on server, true on client — no double render.
+  // useSyncExternalStore: false on server, true on client — no cascading renders
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -51,33 +37,29 @@ export default function Home() {
   return (
     <div className="flex flex-col flex-1">
       {/* Header */}
-      <header className="border-b border-[var(--border)] px-4 py-2.5">
+      <header className="border-b border-[var(--border)] px-6 py-3">
         <div className="mx-auto max-w-5xl flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <Zap className="size-4 text-[var(--tempo-primary)]" />
-            <span className="font-mono text-sm font-medium tracking-widest uppercase text-[var(--text-primary)]">
+            <Zap className="size-5 text-[var(--tempo-bright)]" />
+            <span className="font-[var(--font-bricolage)] text-lg font-bold text-white">
               Pay Across Chains
             </span>
           </div>
-          {/* Hide wallet buttons on hero screen */}
           {!showHero && (
             <div className="flex items-center gap-3">
+              {/* Tempo account pill in header */}
               {mounted && tempoAddress && (
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(tempoAddress);
-                  }}
-                  title="Click to copy address"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)] bg-[var(--tempo-dim)] hover:bg-[var(--tempo-primary)]/15 transition-colors cursor-pointer"
+                  onClick={() => navigator.clipboard.writeText(tempoAddress)}
+                  title="Click to copy Tempo address"
+                  className="pill-gradient bg-[var(--bg-raised)] border-[var(--tempo-primary)]/30 text-[var(--tempo-bright)] cursor-pointer"
                 >
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--tempo-primary)] opacity-75" />
                     <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--tempo-primary)]" />
                   </span>
-                  <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-bright)]">
-                    Tempo
-                  </span>
-                  <span className="font-mono text-[10px] text-[var(--text-secondary)]">
+                  <span className="text-xs font-medium">Tempo</span>
+                  <span className="text-xs text-[var(--text-dim)] font-mono">
                     {tempoAddress.slice(0, 6)}...{tempoAddress.slice(-4)}
                   </span>
                 </button>
@@ -92,16 +74,16 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Pill Tabs */}
-      <div className="border-b border-[var(--border)] px-4 py-2">
-        <div className="mx-auto max-w-5xl flex gap-2">
+      {/* Tabs */}
+      <div className="border-b border-[var(--border)] px-6 py-2">
+        <div className="mx-auto max-w-5xl flex gap-1">
           {(["race", "migration"] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-1.5 rounded-sm font-mono text-xs uppercase tracking-wider transition-all ${
+              className={`px-5 py-2 rounded-xl text-sm font-medium transition-all ${
                 activeTab === tab
-                  ? "bg-[var(--bg-raised)] text-[var(--tempo-bright)] border border-[var(--tempo-primary)]"
+                  ? "bg-[var(--bg-raised)] text-white border border-[var(--border-bright)]"
                   : "text-[var(--text-dim)] hover:text-[var(--text-secondary)] border border-transparent"
               }`}
             >
@@ -112,78 +94,70 @@ export default function Home() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 px-4">
-        <div className="mx-auto max-w-5xl py-8">
-          {activeTab === "race" ? (
-            showHero ? (
-              /* ========== HERO — SPLIT LAYOUT ========== */
-              <div className="diagonal-grid min-h-[70vh] flex items-center">
-                <div className="w-full grid grid-cols-1 lg:grid-cols-[1fr_0.7fr] gap-12 items-center">
-                  {/* Left: Introduction */}
-                  <div className="space-y-6">
-                    {/* Eyebrow */}
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]" />
-                      </span>
-                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--success)]">
-                        Mainnet &middot; Live
-                      </span>
-                    </div>
+      <main className="flex-1">
+        {activeTab === "race" ? (
+          showHero ? (
+            /* ========== HERO — Living mesh gradient ========== */
+            <div className="mesh-gradient min-h-[85vh] flex items-center justify-center px-6">
+              <div className="relative z-10 text-center max-w-2xl mx-auto space-y-8">
+                {/* Heading */}
+                <h1 className="font-[var(--font-bricolage)] text-5xl md:text-6xl font-extrabold text-white leading-[1.1]">
+                  Pay Across Chains
+                </h1>
 
-                    {/* Title */}
-                    <h1 className="font-mono text-3xl lg:text-4xl font-medium tracking-[0.15em] uppercase text-[var(--text-primary)] leading-tight">
-                      Pay Across
-                      <br />
-                      Chains
-                    </h1>
+                {/* Subtext */}
+                <p className="text-lg text-[var(--text-secondary)] max-w-md mx-auto">
+                  The same payment. Three chains. Watch Tempo win.
+                </p>
 
-                    {/* Subtitle */}
-                    <p className="text-sm text-[var(--text-secondary)]">
-                      Same payment. Ethereum. Base. Tempo. Watch who wins.
-                    </p>
+                {/* Chain badges */}
+                <div className="flex justify-center gap-3">
+                  <span
+                    className="pill-gradient border-[var(--eth-primary)]/40 text-[var(--eth-primary)]"
+                    style={{ background: "var(--bg-raised)" }}
+                  >
+                    <span>&#x2B21;</span> Ethereum
+                  </span>
+                  <span
+                    className="pill-gradient border-[var(--base-primary)]/40 text-[var(--base-primary)]"
+                    style={{ background: "var(--bg-raised)" }}
+                  >
+                    <span>&#x25CE;</span> Base
+                  </span>
+                  <span
+                    className="pill-gradient border-[var(--tempo-primary)]/40 text-[var(--tempo-primary)]"
+                    style={{ background: "var(--bg-raised)" }}
+                  >
+                    <span>&#x26A1;</span> Tempo
+                  </span>
+                </div>
 
-                    {/* Chain badges */}
-                    <div className="flex gap-2">
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--eth-primary)]/30 bg-[var(--eth-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--eth-primary)]">
-                        <span>&#x2B21;</span> Ethereum
-                      </span>
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--base-primary)]/30 bg-[var(--base-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--base-primary)]">
-                        <span>&#x25CE;</span> Base
-                      </span>
-                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--tempo-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-primary)]">
-                        <span>&#x26A1;</span> Tempo
-                      </span>
-                    </div>
-
-                    {/* Connect button */}
-                    <button
-                      onClick={() => {
-                        const btn = document.querySelector(
-                          "[data-testid='rk-connect-button']"
-                        ) as HTMLButtonElement;
-                        btn?.click();
-                      }}
-                      className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-xs uppercase tracking-[0.15em] py-3.5 transition-all"
-                    >
-                      Connect Wallet to Start &rarr;
-                    </button>
-                    {/* Hidden RainbowKit button */}
-                    <div className="hidden">
-                      <ConnectButton />
-                    </div>
+                {/* Connect CTA */}
+                <div className="space-y-3">
+                  <button
+                    onClick={() => {
+                      const btn = document.querySelector(
+                        "[data-testid='rk-connect-button']"
+                      ) as HTMLButtonElement;
+                      btn?.click();
+                    }}
+                    className="btn-tempo rounded-xl px-10 py-4 text-base font-semibold mx-auto block"
+                  >
+                    Connect Wallet
+                  </button>
+                  <div className="hidden">
+                    <ConnectButton />
                   </div>
-
-                  {/* Right: Idle race track preview */}
-                  <div className="hidden lg:block opacity-40">
-                    <RaceTrack chainStates={makeIdleStates()} />
-                  </div>
+                  <p className="text-sm text-[var(--text-dim)]">
+                    Real transactions on mainnet
+                  </p>
                 </div>
               </div>
-            ) : !raceStarted && !dryRun ? (
-              /* Funding checklist screen */
-              <div className="space-y-6">
+            </div>
+          ) : !raceStarted && !dryRun ? (
+            /* Funding checklist screen */
+            <div className="px-6 py-10">
+              <div className="mx-auto max-w-lg space-y-6">
                 {!tempoAddress && <TempoConnect />}
                 <FundingChecklist
                   onAllFunded={setAllFunded}
@@ -192,22 +166,24 @@ export default function Home() {
                 {allFunded && bothConnected && (
                   <button
                     onClick={() => setRaceStarted(true)}
-                    className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-12 transition-all flex items-center justify-center gap-2"
+                    className="btn-tempo w-full rounded-xl py-4 text-base font-bold"
                   >
                     Start the Race &rarr;
                   </button>
                 )}
                 {(!allFunded || !bothConnected) && (
-                  <p className="text-[10px] font-mono text-[var(--text-dim)] text-center uppercase tracking-wider">
+                  <p className="text-sm text-[var(--text-dim)] text-center">
                     {!tempoAddress
                       ? "Connect Tempo Wallet to continue"
                       : "Fund all chains to unlock the race"}
                   </p>
                 )}
               </div>
-            ) : (
-              /* Race screen */
-              <div className="space-y-4">
+            </div>
+          ) : (
+            /* Race screen */
+            <div className="px-6 py-8">
+              <div className="mx-auto max-w-5xl space-y-4">
                 <RaceForm
                   allFunded={true}
                   tempoAddress={tempoAddress}
@@ -215,17 +191,21 @@ export default function Home() {
                   dryRun={dryRun}
                 />
               </div>
-            )
-          ) : (
-            <MigrationCards />
-          )}
-        </div>
+            </div>
+          )
+        ) : (
+          <div className="px-6 py-10">
+            <div className="mx-auto max-w-3xl">
+              <MigrationCards />
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border)] py-3 px-4">
+      <footer className="border-t border-[var(--border)] py-4 px-6">
         <div className="mx-auto max-w-5xl flex justify-end">
-          <span className="text-[10px] text-[var(--text-dim)] font-mono">
+          <span className="text-xs text-[var(--text-dim)]">
             All transactions settle on mainnet
           </span>
         </div>

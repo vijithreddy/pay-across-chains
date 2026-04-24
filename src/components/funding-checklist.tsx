@@ -12,20 +12,18 @@ import {
   BRIDGE_LINKS,
   CHAIN_COLORS,
   CHAIN_NAMES,
-  CHAIN_BORDER_CLASSES,
   transports,
 } from "@/lib/chains";
 import { erc20Abi } from "@/lib/abi";
 import { ExternalLink } from "lucide-react";
 
-/** Reads USDC balance via balanceOf for any chain — Tempo: NEVER use eth_getBalance (returns dummy) */
+/** Reads USDC balance via balanceOf — Tempo: NEVER use eth_getBalance (returns dummy) */
 function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   const chainMap = {
     [mainnet.id]: mainnet,
     [base.id]: base,
     [tempo.id]: tempo,
   } as const;
-
   return useQuery({
     queryKey: ["usdc-balance", chainId, address],
     enabled: !!address,
@@ -37,18 +35,17 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
         chain,
         transport: transports[chainId as keyof typeof transports],
       });
-      const balance = await client.readContract({
+      return client.readContract({
         address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
         abi: erc20Abi,
         functionName: "balanceOf",
         args: [address],
       });
-      return balance;
     },
   });
 }
 
-/** Shows USDC balance per chain with FUNDED/NOT FUNDED badges — gates the race start */
+/** Shows USDC balance per chain with FUNDED/NEEDED badges — gates the race start */
 export function FundingChecklist({
   onAllFunded,
   tempoAddress,
@@ -57,7 +54,6 @@ export function FundingChecklist({
   tempoAddress?: `0x${string}`;
 }) {
   const { address } = useAccount();
-  // useSyncExternalStore avoids cascading setState-in-useEffect — false on server, true on client
   const mounted = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -83,7 +79,6 @@ export function FundingChecklist({
       query.data !== undefined
         ? parseFloat(formatUnits(query.data, 6)).toFixed(2)
         : null;
-
     return {
       chainId,
       name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES],
@@ -103,65 +98,94 @@ export function FundingChecklist({
 
   if (!mounted) return null;
 
+  const fundedCount = statuses.filter((s) => s.funded).length;
+
   return (
-    <div className="space-y-2">
-      <h3 className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">
-        Funding Checklist
-      </h3>
-      {statuses.map((s) => (
-        <div
-          key={s.chainId}
-          className={`${CHAIN_BORDER_CLASSES[s.chainId]} bg-[var(--bg-surface)] border border-[var(--border)] rounded-sm px-4 py-3 flex items-center justify-between transition-all hover:border-[var(--border-bright)]`}
-        >
-          <div className="flex items-center gap-3">
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: s.color }}
-            />
-            <div>
-              <div className="text-sm font-medium text-[var(--text-primary)]">
-                {s.name}
+    <div className="gradient-border p-6 space-y-5">
+      {/* Header */}
+      <div>
+        <h2 className="font-[var(--font-bricolage)] text-xl font-bold text-white">
+          Fund Your Wallet
+        </h2>
+        <p className="text-sm text-[var(--text-secondary)] mt-1">
+          Three chains need USDC to race
+        </p>
+      </div>
+
+      {/* Progress dots */}
+      <div className="flex gap-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className={`h-1.5 flex-1 rounded-full transition-all ${
+              i < fundedCount
+                ? "bg-[var(--tempo-primary)]"
+                : "bg-[var(--bg-elevated)]"
+            }`}
+          />
+        ))}
+      </div>
+
+      {/* Chain rows */}
+      <div className="space-y-1">
+        {statuses.map((s, i) => (
+          <div key={s.chainId}>
+            <div className="flex items-center justify-between py-3.5 px-1 rounded-xl hover:bg-[var(--bg-raised)] transition-all group">
+              <div className="flex items-center gap-3">
+                {/* Chain icon circle with gradient */}
+                <div
+                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{
+                    background: `linear-gradient(135deg, ${s.color}, ${s.color}aa)`,
+                  }}
+                >
+                  {s.name[0]}
+                </div>
+                <div>
+                  <div className="text-sm font-medium text-white">{s.name}</div>
+                  <div className="text-xs text-[var(--text-dim)]">
+                    Need {s.required}
+                  </div>
+                </div>
               </div>
-              <div className="text-[10px] font-mono text-[var(--text-dim)] uppercase">
-                Need {s.required}
+              <div className="flex items-center gap-3">
+                {s.loading ? (
+                  <div className="h-4 w-20 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
+                ) : (
+                  <>
+                    <span className="font-mono text-sm text-white tabular-nums">
+                      {s.balance}{" "}
+                      <span className="text-[var(--text-dim)]">USDC</span>
+                    </span>
+                    {s.funded ? (
+                      <span
+                        className="px-2.5 py-1 rounded-full text-[10px] font-semibold text-white"
+                        style={{
+                          background: `linear-gradient(135deg, ${s.color}, ${s.color}cc)`,
+                        }}
+                      >
+                        FUNDED
+                      </span>
+                    ) : (
+                      <a
+                        href={s.bridgeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-medium border border-[var(--border-bright)] text-[var(--text-secondary)] hover:text-white transition-colors"
+                      >
+                        Bridge <ExternalLink className="size-2.5" />
+                      </a>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {s.loading ? (
-              <div
-                className="shimmer h-4 w-20 rounded-sm"
-                style={{
-                  background: `linear-gradient(90deg, transparent 0%, ${s.color}22 50%, transparent 100%)`,
-                  backgroundSize: "200% 100%",
-                  animation: "shimmer 2s ease-in-out infinite",
-                }}
-              />
-            ) : (
-              <>
-                <span className="font-mono text-sm text-[var(--text-primary)] timer-display">
-                  {s.balance}{" "}
-                  <span className="text-[var(--text-dim)]">USDC</span>
-                </span>
-                {s.funded ? (
-                  <span className="px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20">
-                    Funded
-                  </span>
-                ) : (
-                  <a
-                    href={s.bridgeLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase bg-[var(--destructive)]/10 text-[var(--destructive)] border border-[var(--destructive)]/20 hover:bg-[var(--destructive)]/20 transition-colors"
-                  >
-                    Fund <ExternalLink className="size-2.5" />
-                  </a>
-                )}
-              </>
+            {i < statuses.length - 1 && (
+              <div className="h-px bg-[var(--border)] mx-1" />
             )}
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }

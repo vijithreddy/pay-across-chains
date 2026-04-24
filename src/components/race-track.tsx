@@ -229,7 +229,7 @@ export function RaceTrack({
   chainStates: Record<number, ChainRaceState>;
 }) {
   return (
-    <div className="w-full overflow-hidden rounded-sm border border-[var(--border)] bg-[var(--bg-surface)]">
+    <div className="w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-surface)]">
       <svg
         viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
         className="w-full h-auto"

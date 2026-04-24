@@ -9,9 +9,9 @@ export function TempoConnect() {
 
   if (isPending) {
     return (
-      <div className="chain-border-tempo flex items-center gap-2 rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--tempo-dim)] px-4 py-3">
-        <Loader2 className="size-3.5 animate-spin text-[var(--tempo-primary)]" />
-        <span className="text-xs font-mono uppercase tracking-wider text-[var(--tempo-primary)]">
+      <div className="flex items-center justify-center gap-3 rounded-xl border border-[var(--tempo-primary)]/20 bg-[var(--bg-surface)] px-5 py-4">
+        <Loader2 className="size-4 animate-spin text-[var(--tempo-bright)]" />
+        <span className="text-sm text-[var(--tempo-bright)]">
           Signing in to Tempo Wallet...
         </span>
       </div>
@@ -20,20 +20,23 @@ export function TempoConnect() {
 
   if (address) {
     return (
-      <div className="chain-border-tempo flex items-center justify-between rounded-sm border border-[var(--tempo-primary)]/20 bg-[var(--tempo-dim)] px-4 py-3">
+      <div className="flex items-center justify-between rounded-xl border border-[var(--tempo-primary)]/20 bg-[var(--bg-surface)] px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-2 h-2 rounded-full bg-[var(--tempo-primary)]" />
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+            style={{ background: "var(--tempo-gradient)" }}
+          >
+            T
+          </div>
           <div>
-            <div className="text-xs font-mono uppercase tracking-wider text-[var(--text-primary)]">
-              Tempo Wallet
-            </div>
+            <div className="text-sm font-medium text-white">Tempo Wallet</div>
             <button
               onClick={(e) => {
-                e.stopPropagation(); // Prevent parent div click from triggering signOut
+                e.stopPropagation(); // Prevent parent from intercepting the copy action
                 navigator.clipboard.writeText(address);
               }}
               title="Click to copy"
-              className="text-[10px] font-mono text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
+              className="text-xs font-mono text-[var(--text-dim)] hover:text-white transition-colors"
             >
               {address.slice(0, 6)}...{address.slice(-4)}
             </button>
@@ -41,7 +44,7 @@ export function TempoConnect() {
         </div>
         <button
           onClick={signOut}
-          className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-secondary)] transition-colors"
+          className="text-xs text-[var(--text-dim)] hover:text-white transition-colors"
         >
           Disconnect
         </button>
@@ -52,7 +55,7 @@ export function TempoConnect() {
   return (
     <button
       onClick={signIn}
-      className="w-full rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--bg-surface)] hover:bg-[var(--tempo-dim)] text-[var(--tempo-primary)] font-mono text-xs uppercase tracking-wider py-3 transition-all hover:border-[var(--tempo-primary)]/50"
+      className="btn-tempo w-full rounded-xl py-3.5 text-sm font-semibold"
     >
       Sign in to Tempo Wallet
     </button>

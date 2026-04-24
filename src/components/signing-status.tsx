@@ -16,7 +16,7 @@ export function SigningStatus({
   chainStates: Record<number, ChainRaceState>;
 }) {
   return (
-    <div className="space-y-2 border border-[var(--border)] rounded-sm bg-[var(--bg-surface)] p-4">
+    <div className="space-y-2 border border-[var(--border)] rounded-xl bg-[var(--bg-surface)] p-4">
       <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-[var(--text-dim)] mb-3">
         Awaiting Signatures
       </div>
@@ -32,7 +32,7 @@ export function SigningStatus({
         return (
           <div
             key={id}
-            className={`${CHAIN_BORDER_CLASSES[id]} flex items-center justify-between px-4 py-3 rounded-sm border transition-all ${
+            className={`${CHAIN_BORDER_CLASSES[id]} flex items-center justify-between px-4 py-3 rounded-xl border transition-all ${
               isSigned
                 ? "border-[var(--success)]/20 bg-[var(--success)]/5"
                 : isSigning

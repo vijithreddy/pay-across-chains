@@ -169,7 +169,7 @@ export function RaceForm({
             setPhase("idle");
             confettiFired.current = false;
           }}
-          className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] font-mono text-xs uppercase tracking-wider h-10 transition-all"
+          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] font-mono text-xs uppercase tracking-wider h-10 transition-all"
         >
           Race Again
         </button>
@@ -210,25 +210,25 @@ function PaymentForm({
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
             placeholder="0x..."
-            className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
           />
         </div>
         <div>
           <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1">
             Amount
           </label>
-          <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono">
             {amount} USDC
           </div>
         </div>
         <div>
           <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1">
             Memo{" "}
-            <span className="ml-1.5 px-1.5 py-0.5 rounded-sm text-[8px] bg-[var(--tempo-dim)] text-[var(--tempo-bright)] border border-[var(--tempo-primary)]/30">
+            <span className="ml-1.5 px-1.5 py-0.5 rounded-xl text-[8px] bg-[var(--tempo-dim)] text-[var(--tempo-bright)] border border-[var(--tempo-primary)]/30">
               TEMPO EXCLUSIVE
             </span>
           </label>
-          <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono truncate">
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono truncate">
             {memo}
           </div>
         </div>
@@ -236,7 +236,7 @@ function PaymentForm({
       <button
         onClick={onStart}
         disabled={!allFunded || !recipient || racing}
-        className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        className="w-full rounded-xl bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         <Zap className="size-4" /> Send on All Three
       </button>

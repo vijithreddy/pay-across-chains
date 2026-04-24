@@ -1,18 +1,17 @@
 import type { Metadata } from "next";
-import { DM_Mono, Sora, JetBrains_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/providers";
 
-const dmMono = DM_Mono({
-  variable: "--font-dm-mono",
+const bricolage = Bricolage_Grotesque({
+  variable: "--font-bricolage",
   subsets: ["latin"],
-  weight: ["400", "500"],
+  weight: ["400", "600", "700", "800"],
 });
 
-const sora = Sora({
-  variable: "--font-sora",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 const jetbrainsMono = JetBrains_Mono({
@@ -35,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${dmMono.variable} ${sora.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
+      className={`${bricolage.variable} ${geist.variable} ${jetbrainsMono.variable} h-full antialiased dark`}
     >
       <body suppressHydrationWarning className="min-h-full flex flex-col">
         <Providers>{children}</Providers>

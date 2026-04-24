@@ -7,10 +7,9 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sora);
-  --font-mono: var(--font-dm-mono);
-  --font-code: var(--font-jetbrains-mono);
-  --font-heading: var(--font-dm-mono);
+  --font-sans: var(--font-geist);
+  --font-mono: var(--font-jetbrains-mono);
+  --font-heading: var(--font-bricolage);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,72 +49,107 @@
 }
 
 /* ============================================
-   DESIGN SYSTEM — Dark Terminal / Race Telemetry
+   DESIGN SYSTEM — Modern Premium Dark
+   Stripe / Linear / Vercel aesthetic
    ============================================ */
 
 :root {
   /* Base surfaces */
-  --bg-base: #080b0f;
-  --bg-surface: #0e1218;
-  --bg-raised: #161c26;
-  --border: #1e2733;
-  --border-bright: #2e3d50;
+  --bg-base: #0a0a0f;
+  --bg-surface: #111118;
+  --bg-raised: #1a1a24;
+  --bg-elevated: #222230;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-bright: rgba(255, 255, 255, 0.12);
 
   /* Chain colors */
   --eth-primary: #627eea;
-  --eth-dim: #627eea22;
+  --eth-gradient: linear-gradient(135deg, #627eea, #8fa4f3);
+  --eth-glow: #627eea40;
   --base-primary: #0052ff;
-  --base-dim: #0052ff22;
+  --base-gradient: linear-gradient(135deg, #0052ff, #4d8aff);
+  --base-glow: #0052ff40;
   --tempo-primary: #7c3aed;
-  --tempo-dim: #7c3aed22;
+  --tempo-gradient: linear-gradient(135deg, #7c3aed, #a78bfa);
+  --tempo-glow: #7c3aed50;
   --tempo-bright: #a78bfa;
 
   /* Semantic */
   --success: #10b981;
   --warning: #f59e0b;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-dim: #64748b;
+  --text-primary: #ffffff;
+  --text-secondary: rgba(255, 255, 255, 0.6);
+  --text-dim: rgba(255, 255, 255, 0.3);
 
   /* Shadcn overrides */
-  --background: #080b0f;
-  --foreground: #f1f5f9;
-  --card: #0e1218;
-  --card-foreground: #f1f5f9;
-  --popover: #0e1218;
-  --popover-foreground: #f1f5f9;
+  --background: #0a0a0f;
+  --foreground: #ffffff;
+  --card: #111118;
+  --card-foreground: #ffffff;
+  --popover: #111118;
+  --popover-foreground: #ffffff;
   --primary: #7c3aed;
-  --primary-foreground: #f1f5f9;
-  --secondary: #161c26;
-  --secondary-foreground: #f1f5f9;
-  --muted: #161c26;
-  --muted-foreground: #94a3b8;
-  --accent: #161c26;
-  --accent-foreground: #f1f5f9;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a24;
+  --secondary-foreground: #ffffff;
+  --muted: #1a1a24;
+  --muted-foreground: rgba(255, 255, 255, 0.6);
+  --accent: #1a1a24;
+  --accent-foreground: #ffffff;
   --destructive: #ef4444;
-  --border: #1e2733;
-  --input: #1e2733;
+  --input: rgba(255, 255, 255, 0.06);
   --ring: #7c3aed;
-  --radius: 0.25rem;
+  --radius: 0.75rem;
 }
 
-/* Diagonal grid background — subtle depth pattern */
-.diagonal-grid {
-  background-image:
-    linear-gradient(45deg, #1e273308 1px, transparent 1px),
-    linear-gradient(-45deg, #1e273308 1px, transparent 1px);
-  background-size: 40px 40px;
+/* Living mesh gradient background for hero */
+.mesh-gradient {
+  position: relative;
+  overflow: hidden;
+}
+.mesh-gradient::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(600px circle at 20% 30%, var(--eth-glow), transparent 60%),
+    radial-gradient(500px circle at 80% 70%, var(--base-glow), transparent 60%),
+    radial-gradient(700px circle at 50% 50%, var(--tempo-glow), transparent 50%);
+  animation: mesh-drift 8s ease-in-out infinite alternate;
+  opacity: 0.15;
+  pointer-events: none;
+}
+@keyframes mesh-drift {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(20px, -15px) scale(1.05);
+  }
 }
 
-/* Glass morphism card */
-.glass-card {
-  background: rgba(14, 18, 24, 0.7);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
+/* Gradient border card */
+.gradient-border {
+  position: relative;
+  background: var(--bg-surface);
+  border-radius: 1rem;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: var(--tempo-gradient);
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
-/* Chain left-border accents */
+/* Chain left-border accents — now gradients */
 .chain-border-eth {
   border-left: 4px solid var(--eth-primary);
 }
@@ -135,32 +169,54 @@
     background-position: 200% 0;
   }
 }
-.shimmer {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--border-bright) 50%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 2s ease-in-out infinite;
-}
-
-/* Pulse glow for confirmed states */
-@keyframes pulse-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 transparent;
-  }
-  50% {
-    box-shadow: 0 0 12px 2px var(--tempo-dim);
-  }
-}
 
 /* Timer monospace */
 .timer-display {
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+}
+
+/* Hover glow for interactive elements */
+.hover-glow {
+  transition: all 200ms ease-out;
+}
+.hover-glow:hover {
+  transform: scale(1.02);
+  box-shadow: 0 0 20px 4px var(--tempo-glow);
+}
+
+/* Tempo gradient button */
+.btn-tempo {
+  background: var(--tempo-gradient);
+  color: white;
+  font-weight: 600;
+  transition: all 200ms ease-out;
+}
+.btn-tempo:hover {
+  transform: scale(1.01);
+  box-shadow: 0 0 24px 4px var(--tempo-glow);
+}
+.btn-tempo:disabled {
+  background: var(--bg-elevated);
+  color: var(--text-dim);
+  transform: none;
+  box-shadow: none;
+}
+
+/* Gradient pill */
+.pill-gradient {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: all 200ms ease-out;
+}
+.pill-gradient:hover {
+  box-shadow: 0 0 12px 2px currentColor;
 }
 
 @layer base {

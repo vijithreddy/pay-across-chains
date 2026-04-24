@@ -71,7 +71,7 @@ function CopyButton({ text }: { text: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="absolute top-2 right-2 p-1.5 rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] hover:border-[var(--border-bright)] transition-colors"
+      className="absolute top-2 right-2 p-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-raised)] hover:border-[var(--border-bright)] transition-colors"
       aria-label="Copy code"
     >
       {copied ? (
@@ -102,7 +102,7 @@ function CodeBlock({
 
   return (
     <div
-      className="relative rounded-sm border bg-[var(--bg-base)] overflow-hidden"
+      className="relative rounded-xl border bg-[var(--bg-base)] overflow-hidden"
       style={{ borderColor }}
     >
       <div
@@ -164,11 +164,11 @@ export function MigrationCards() {
       {cards.map((card, i) => (
         <div
           key={i}
-          className="rounded-sm border border-[var(--border)] bg-[var(--bg-surface)] overflow-hidden"
+          className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] overflow-hidden"
         >
           <div className="px-4 py-3 border-b border-[var(--border)]">
             <div className="flex items-center gap-2.5">
-              <span className="flex items-center justify-center w-5 h-5 rounded-sm bg-[var(--tempo-dim)] font-mono text-[10px] font-bold text-[var(--tempo-bright)]">
+              <span className="flex items-center justify-center w-5 h-5 rounded-xl bg-[var(--tempo-dim)] font-mono text-[10px] font-bold text-[var(--tempo-bright)]">
                 {i + 1}
               </span>
               <h3 className="font-mono text-sm font-medium text-[var(--text-primary)] uppercase tracking-wider">
