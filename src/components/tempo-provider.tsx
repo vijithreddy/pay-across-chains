@@ -62,8 +62,11 @@ export function TempoProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (providerRef.current) return;
     console.log("[tempo-provider] Creating Provider...");
+    // Use popup on localhost (WebAuthn requires valid TLS — iframes fail on http://localhost).
+    // Use iframe in production (has HTTPS).
+    const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
     providerRef.current = Provider.create({
-      adapter: dialog({ dialog: Dialog.iframe() }),
+      adapter: dialog({ dialog: isLocalhost ? Dialog.popup() : Dialog.iframe() }),
       chains: [tempo],
     });
     console.log("[tempo-provider] Provider created:", providerRef.current);

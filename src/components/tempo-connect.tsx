@@ -2,16 +2,15 @@
 
 import { useTempoWallet } from "./tempo-provider";
 import { Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 
 export function TempoConnect() {
   const { address, signIn, signOut, isPending } = useTempoWallet();
 
   if (isPending) {
     return (
-      <div className="flex items-center gap-2 rounded-xl border border-purple-500/30 bg-purple-950/10 px-4 py-3">
-        <Loader2 className="size-4 animate-spin text-purple-400" />
-        <span className="text-sm text-purple-400">
+      <div className="chain-border-tempo flex items-center gap-2 rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--tempo-dim)] px-4 py-3">
+        <Loader2 className="size-3.5 animate-spin text-[var(--tempo-primary)]" />
+        <span className="text-xs font-mono uppercase tracking-wider text-[var(--tempo-primary)]">
           Signing in to Tempo Wallet...
         </span>
       </div>
@@ -20,21 +19,21 @@ export function TempoConnect() {
 
   if (address) {
     return (
-      <div className="flex items-center justify-between rounded-xl border border-purple-500/20 bg-purple-950/10 px-4 py-3">
+      <div className="chain-border-tempo flex items-center justify-between rounded-sm border border-[var(--tempo-primary)]/20 bg-[var(--tempo-dim)] px-4 py-3">
         <div className="flex items-center gap-3">
-          <div className="w-3 h-3 rounded-full bg-purple-500" />
+          <div className="w-2 h-2 rounded-full bg-[var(--tempo-primary)]" />
           <div>
-            <div className="text-sm font-medium text-zinc-200">
+            <div className="text-xs font-mono uppercase tracking-wider text-[var(--text-primary)]">
               Tempo Wallet
             </div>
-            <div className="text-xs text-zinc-500 font-mono">
+            <div className="text-[10px] font-mono text-[var(--text-dim)]">
               {address.slice(0, 6)}...{address.slice(-4)}
             </div>
           </div>
         </div>
         <button
           onClick={signOut}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+          className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-secondary)] transition-colors"
         >
           Disconnect
         </button>
@@ -43,12 +42,11 @@ export function TempoConnect() {
   }
 
   return (
-    <Button
+    <button
       onClick={signIn}
-      variant="outline"
-      className="w-full border-purple-500/30 text-purple-400 hover:bg-purple-950/20 hover:text-purple-300"
+      className="w-full rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--bg-surface)] hover:bg-[var(--tempo-dim)] text-[var(--tempo-primary)] font-mono text-xs uppercase tracking-wider py-3 transition-all hover:border-[var(--tempo-primary)]/50"
     >
       Sign in to Tempo Wallet
-    </Button>
+    </button>
   );
 }

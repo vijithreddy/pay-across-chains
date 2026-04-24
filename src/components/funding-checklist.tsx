@@ -15,9 +15,8 @@ import {
   transports,
 } from "@/lib/chains";
 import { erc20Abi } from "@/lib/abi";
-import { CheckCircle2, XCircle, ExternalLink, Loader2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
-// Read USDC balance via balanceOf for any chain
 function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   const chainMap = {
     [mainnet.id]: mainnet,
@@ -47,16 +46,10 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   });
 }
 
-type ChainStatus = {
-  chainId: number;
-  name: string;
-  color: string;
-  funded: boolean;
-  balance: string;
-  required: string;
-  token: string;
-  bridgeLink: string;
-  loading: boolean;
+const CHAIN_BORDER_CLASSES: Record<number, string> = {
+  [mainnet.id]: "chain-border-eth",
+  [base.id]: "chain-border-base",
+  [tempo.id]: "chain-border-tempo",
 };
 
 export function FundingChecklist({
@@ -73,7 +66,6 @@ export function FundingChecklist({
     setMounted(true);
   }, []);
 
-  // Eth/Base: check MetaMask address. Tempo: check Tempo Wallet address.
   const ethUsdc = useUsdcBalance(mainnet.id, address);
   const baseUsdc = useUsdcBalance(base.id, address);
   const tempoUsdc = useUsdcBalance(tempo.id, tempoAddress);
@@ -84,15 +76,15 @@ export function FundingChecklist({
     { chainId: tempo.id, query: tempoUsdc },
   ];
 
-  const statuses: ChainStatus[] = balances.map(({ chainId, query }) => {
+  const statuses = balances.map(({ chainId, query }) => {
     const funded = query.data
       ? parseFloat(formatUnits(query.data, 6)) >=
         MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].amount
       : false;
     const balance =
       query.data !== undefined
-        ? `${parseFloat(formatUnits(query.data, 6)).toFixed(2)} USDC`
-        : "—";
+        ? parseFloat(formatUnits(query.data, 6)).toFixed(2)
+        : null;
 
     return {
       chainId,
@@ -101,15 +93,12 @@ export function FundingChecklist({
       funded,
       balance,
       required: MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].label,
-      token: "USDC",
       bridgeLink: BRIDGE_LINKS[chainId as keyof typeof BRIDGE_LINKS],
       loading: query.isLoading,
     };
   });
 
   const allFunded = statuses.every((s) => s.funded);
-
-  // Notify parent
   if (typeof onAllFunded === "function") {
     queueMicrotask(() => onAllFunded(allFunded));
   }
@@ -117,48 +106,59 @@ export function FundingChecklist({
   if (!mounted) return null;
 
   return (
-    <div className="w-full space-y-3">
-      <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
+    <div className="space-y-2">
+      <h3 className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">
         Funding Checklist
       </h3>
       {statuses.map((s) => (
         <div
           key={s.chainId}
-          className="flex items-center justify-between rounded-xl border border-zinc-800/50 bg-[#0a0a0f] px-4 py-3.5"
+          className={`${CHAIN_BORDER_CLASSES[s.chainId]} bg-[var(--bg-surface)] border border-[var(--border)] rounded-sm px-4 py-3 flex items-center justify-between transition-all hover:border-[var(--border-bright)]`}
         >
           <div className="flex items-center gap-3">
             <div
-              className="w-3 h-3 rounded-full"
+              className="w-2 h-2 rounded-full"
               style={{ backgroundColor: s.color }}
             />
             <div>
-              <div className="text-sm font-medium text-zinc-100">{s.name}</div>
-              <div className="text-xs text-zinc-500">
-                Need &ge; {s.required}
+              <div className="text-sm font-medium text-[var(--text-primary)]">
+                {s.name}
+              </div>
+              <div className="text-[10px] font-mono text-[var(--text-dim)] uppercase">
+                Need {s.required}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-zinc-300 font-mono">
-              {s.loading ? (
-                <Loader2 className="size-4 animate-spin text-zinc-500" />
-              ) : (
-                s.balance
-              )}
-            </span>
-            {s.loading ? null : s.funded ? (
-              <CheckCircle2 className="size-5 text-emerald-400" />
+            {s.loading ? (
+              <div
+                className="shimmer h-4 w-20 rounded-sm"
+                style={{
+                  background: `linear-gradient(90deg, transparent 0%, ${s.color}22 50%, transparent 100%)`,
+                  backgroundSize: "200% 100%",
+                  animation: "shimmer 2s ease-in-out infinite",
+                }}
+              />
             ) : (
-              <a
-                href={s.bridgeLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300"
-              >
-                <XCircle className="size-5" />
-                <span>Fund</span>
-                <ExternalLink className="size-3" />
-              </a>
+              <>
+                <span className="font-mono text-sm text-[var(--text-primary)] timer-display">
+                  {s.balance} <span className="text-[var(--text-dim)]">USDC</span>
+                </span>
+                {s.funded ? (
+                  <span className="px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20">
+                    Funded
+                  </span>
+                ) : (
+                  <a
+                    href={s.bridgeLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase bg-[var(--destructive)]/10 text-[var(--destructive)] border border-[var(--destructive)]/20 hover:bg-[var(--destructive)]/20 transition-colors"
+                  >
+                    Fund <ExternalLink className="size-2.5" />
+                  </a>
+                )}
+              </>
             )}
           </div>
         </div>

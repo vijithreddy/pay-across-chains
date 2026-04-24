@@ -8,47 +8,51 @@ import { startRace, type ChainRaceState, type TxState } from "@/lib/race-engine"
 import { useTempoWallet } from "./tempo-provider";
 import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
-import { Button } from "@/components/ui/button";
 import { Loader2, Zap, CheckCircle2 } from "lucide-react";
 import confetti from "canvas-confetti";
 
 const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
 
+const CHAIN_BORDER_CLASSES: Record<number, string> = {
+  [mainnet.id]: "chain-border-eth",
+  [base.id]: "chain-border-base",
+  [tempo.id]: "chain-border-tempo",
+};
+
 function makeInitialStates(): Record<number, ChainRaceState> {
   const states: Record<number, ChainRaceState> = {};
   for (const id of CHAIN_IDS) {
-    states[id] = {
-      chainId: id,
-      name: CHAIN_NAMES[id as keyof typeof CHAIN_NAMES],
-      state: "idle",
-    };
+    states[id] = { chainId: id, name: CHAIN_NAMES[id as keyof typeof CHAIN_NAMES], state: "idle" };
   }
   return states;
 }
 
-function LiveTimer({ startTime, frozen }: { startTime?: number; frozen?: number }) {
-  const [now, setNow] = useState(performance.now());
+function formatTimer(ms: number): string {
+  const secs = Math.floor(ms / 1000);
+  const frac = Math.floor((ms % 1000) / 10);
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${frac.toString().padStart(2, "0")}`;
+}
 
+function LiveTimer({ startTime, frozen }: { startTime?: number; frozen?: number }) {
+  const [now, setNow] = useState(0);
   useEffect(() => {
     if (!startTime || frozen) return;
     const id = setInterval(() => setNow(performance.now()), 16);
     return () => clearInterval(id);
   }, [startTime, frozen]);
 
-  if (!startTime) return <span className="text-zinc-600">—</span>;
+  if (!startTime) return <span className="text-[var(--text-dim)]">--:--.--</span>;
   const elapsed = (frozen ?? now) - startTime;
-  return (
-    <span className="font-mono tabular-nums">
-      {(elapsed / 1000).toFixed(2)}s
-    </span>
-  );
+  return <span>{formatTimer(elapsed)}</span>;
 }
 
 function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceState> }) {
   return (
-    <div className="space-y-3 rounded-2xl border border-zinc-800/50 bg-[#0a0a0f] p-5">
-      <div className="text-sm font-medium text-zinc-400 mb-3">
-        Sign each transaction — race starts after all 3 are signed
+    <div className="space-y-2 border border-[var(--border)] rounded-sm bg-[var(--bg-surface)] p-4">
+      <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-[var(--text-dim)] mb-3">
+        Awaiting Signatures
       </div>
       {CHAIN_IDS.map((id) => {
         const cs = chainStates[id];
@@ -56,43 +60,39 @@ function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceS
         const name = CHAIN_NAMES[id as keyof typeof CHAIN_NAMES];
         const isSigning = cs?.state === "signing";
         const isSigned = cs?.state === "signed" || cs?.state === "racing" || cs?.state === "confirmed";
-
         return (
           <div
             key={id}
-            className={`flex items-center justify-between rounded-xl border px-4 py-3.5 transition-colors duration-300 ${
+            className={`${CHAIN_BORDER_CLASSES[id]} flex items-center justify-between px-4 py-3 rounded-sm border transition-all ${
               isSigned
-                ? "border-emerald-500/20 bg-emerald-950/20"
+                ? "border-[var(--success)]/20 bg-[var(--success)]/5"
                 : isSigning
-                  ? "border-purple-500/30 bg-purple-950/10"
-                  : "border-zinc-800/40 bg-zinc-900/20"
+                  ? "border-[var(--tempo-primary)]/30 bg-[var(--tempo-dim)]"
+                  : "border-[var(--border)] bg-[var(--bg-base)]"
             }`}
           >
             <div className="flex items-center gap-3">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-sm font-medium text-zinc-200">{name}</span>
+              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-sm font-mono text-[var(--text-primary)]">{name}</span>
             </div>
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2 text-xs font-mono">
               {isSigning && (
                 <>
-                  <Loader2 className="size-4 animate-spin text-purple-400" />
-                  <span className="text-purple-400">Awaiting signature...</span>
+                  <Loader2 className="size-3.5 animate-spin" style={{ color }} />
+                  <span style={{ color }}>SIGNING</span>
                 </>
               )}
               {isSigned && (
                 <>
-                  <CheckCircle2 className="size-4 text-emerald-400" />
-                  <span className="text-emerald-400">Signed</span>
+                  <CheckCircle2 className="size-3.5 text-[var(--success)]" />
+                  <span className="text-[var(--success)]">SIGNED</span>
                 </>
               )}
               {!isSigning && !isSigned && cs?.state !== "error" && (
-                <span className="text-zinc-600">Waiting</span>
+                <span className="text-[var(--text-dim)] uppercase">Waiting</span>
               )}
               {cs?.state === "error" && (
-                <span className="text-red-400 text-xs truncate max-w-48">
+                <span className="text-[var(--destructive)] truncate max-w-48">
                   {cs.error ?? "Failed"}
                 </span>
               )}
@@ -127,20 +127,14 @@ export function RaceForm({
         ...prev,
         [chainId]: { ...prev[chainId], ...update },
       }));
-
-      // Transition to racing phase when we see the first "racing" state
-      if (update.state === "racing") {
-        setPhase("racing");
-      }
-
-      // Fire confetti when Tempo confirms first
+      if (update.state === "racing") setPhase("racing");
       if (update.state === "confirmed" && chainId === tempo.id && !confettiFired.current) {
         confettiFired.current = true;
         confetti({
           particleCount: 150,
           spread: 80,
           origin: { y: 0.4 },
-          colors: ["#7C3AED", "#22c55e", "#a855f7"],
+          colors: ["#7C3AED", "#A78BFA"],
         });
       }
     },
@@ -150,21 +144,13 @@ export function RaceForm({
   const handleStart = async () => {
     if (!address || !recipient) return;
     if (!tempoClient || !tempoAddress) {
-      console.error("[race-form] Cannot start race: Tempo Wallet not connected");
-      console.error("[race-form] tempoClient:", tempoClient, "tempoAddress:", tempoAddress);
       alert("Please sign in to Tempo Wallet first");
       return;
     }
-    console.log("[race-form] Starting race...");
-    console.log("[race-form] EVM address:", address);
-    console.log("[race-form] tempoClient:", tempoClient);
-    console.log("[race-form] tempoClient?.account:", (tempoClient as any)?.account);
-    console.log("[race-form] tempoAddress:", tempoAddress);
     setRacing(true);
     setPhase("signing");
     confettiFired.current = false;
     setChainStates(makeInitialStates());
-
     try {
       await startRace({
         recipient: recipient as `0x${string}`,
@@ -175,35 +161,26 @@ export function RaceForm({
         onUpdate: handleUpdate,
       });
     } catch (err) {
-      console.error("[race-form] Race error:", err);
-      // Signing was rejected — stay in current state to show error
+      console.error("[race] Error:", err);
     }
-
     setRacing(false);
     setPhase("done");
   };
 
   const allDone = CHAIN_IDS.every(
-    (id) =>
-      chainStates[id]?.state === "confirmed" ||
-      chainStates[id]?.state === "error"
+    (id) => chainStates[id]?.state === "confirmed" || chainStates[id]?.state === "error"
   );
-
-  const hasError = CHAIN_IDS.some((id) => chainStates[id]?.state === "error");
   const isSigning = phase === "signing" && !allDone;
   const isRacing = phase === "racing" && !allDone;
 
   return (
-    <div className="space-y-6">
-      {/* Signing Phase */}
+    <div className="space-y-4">
       {isSigning && <SigningStatus chainStates={chainStates} />}
-
-      {/* Race Track — show during racing and results */}
       {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
 
-      {/* Live Timers — only during racing phase */}
+      {/* Status cards during racing */}
       {isRacing && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-2">
           {CHAIN_IDS.map((id) => {
             const cs = chainStates[id];
             const color = CHAIN_COLORS[id as keyof typeof CHAIN_COLORS];
@@ -211,26 +188,25 @@ export function RaceForm({
             return (
               <div
                 key={id}
-                className={`rounded-xl border px-4 py-3 text-center transition-colors duration-300 ${
-                  isConfirmed
-                    ? "border-emerald-500/20 bg-emerald-950/20"
-                    : "border-zinc-800/40 bg-[#0a0a0f]"
+                className={`${CHAIN_BORDER_CLASSES[id]} rounded-sm border bg-[var(--bg-surface)] px-3 py-3 transition-all ${
+                  isConfirmed ? "border-[var(--success)]/30" : "border-[var(--border)]"
                 }`}
+                style={isConfirmed ? { boxShadow: `0 0 12px 1px ${color}22` } : undefined}
               >
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color }}>
+                    {CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]}
+                  </span>
+                </div>
                 <div
-                  className="text-xs font-medium mb-1"
-                  style={{ color }}
+                  className="font-mono text-xl timer-display"
+                  style={{ color: isConfirmed ? "var(--success)" : "var(--text-primary)" }}
                 >
-                  {CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]}
+                  <LiveTimer startTime={cs?.startTime} frozen={isConfirmed ? cs?.endTime : undefined} />
                 </div>
-                <div className={`text-lg ${isConfirmed ? "text-emerald-400" : "text-zinc-100"}`}>
-                  <LiveTimer
-                    startTime={cs?.startTime}
-                    frozen={isConfirmed ? cs?.endTime : undefined}
-                  />
-                </div>
-                <div className="text-xs text-zinc-500 mt-1 capitalize">
-                  {cs?.state === "racing" ? "confirming" : cs?.state ?? "idle"}
+                <div className="font-mono text-[9px] uppercase tracking-wider mt-1 text-[var(--text-dim)]">
+                  {cs?.state === "racing" ? "CONFIRMING" : cs?.state?.toUpperCase() ?? "IDLE"}
                 </div>
               </div>
             );
@@ -240,9 +216,9 @@ export function RaceForm({
 
       {/* Race Form */}
       {phase === "idle" && (
-        <div className="space-y-4 rounded-2xl border border-zinc-800/50 bg-[#0a0a0f] p-5">
+        <div className="space-y-4 rounded-sm border border-[var(--border)] bg-[var(--bg-surface)] p-4">
           <div>
-            <label className="block text-xs font-medium text-zinc-400 mb-1">
+            <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
               Recipient Address
             </label>
             <input
@@ -250,63 +226,59 @@ export function RaceForm({
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
               placeholder="0x..."
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 font-mono placeholder:text-zinc-600 focus:border-purple-500 focus:outline-none"
+              className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
             />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
                 Amount
               </label>
-              <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300 font-mono">
+              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono">
                 {amount} USDC
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-zinc-400 mb-1">
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
                 Memo (Tempo only)
               </label>
-              <div className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300 font-mono truncate">
+              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono truncate">
                 {memo}
               </div>
             </div>
           </div>
 
-          <Button
+          <button
             onClick={handleStart}
             disabled={!allFunded || !recipient || racing}
-            size="lg"
-            className="w-full bg-purple-600 hover:bg-purple-500 text-white font-semibold h-12 text-base disabled:opacity-40"
+            className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
-            <Zap className="size-5 mr-2" />
+            <Zap className="size-4" />
             Send on All Three
-          </Button>
+          </button>
           {!allFunded && (
-            <p className="text-xs text-zinc-500 text-center">
+            <p className="text-[10px] font-mono text-[var(--text-dim)] text-center uppercase tracking-wider">
               {!tempoAddress
-                ? "Connect Tempo Wallet above to unlock the race"
-                : "Fund all chains above to unlock the race"}
+                ? "Connect Tempo Wallet to unlock"
+                : "Fund all chains to unlock"}
             </p>
           )}
         </div>
       )}
 
-      {/* Results */}
       {allDone && <ResultsTable chainStates={chainStates} />}
 
-      {/* Race again */}
       {allDone && (
-        <Button
+        <button
           onClick={() => {
             setChainStates(makeInitialStates());
             setPhase("idle");
             confettiFired.current = false;
           }}
-          variant="outline"
-          className="w-full"
+          className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] font-mono text-xs uppercase tracking-wider h-10 transition-all"
         >
           Race Again
-        </Button>
+        </button>
       )}
     </div>
   );

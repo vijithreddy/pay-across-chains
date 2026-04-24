@@ -18,15 +18,26 @@ function CopyHash({ hash }: { hash: string }) {
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
       }}
-      className="inline-flex items-center gap-1 font-mono text-xs hover:text-zinc-100 transition-colors"
+      className="inline-flex items-center gap-1 font-mono text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
     >
       {short}
-      {copied ? (
-        <Check className="size-3 text-emerald-400" />
-      ) : (
-        <Copy className="size-3 text-zinc-500" />
-      )}
+      {copied ? <Check className="size-2.5 text-[var(--success)]" /> : <Copy className="size-2.5" />}
     </button>
+  );
+}
+
+function Pill({ children, color }: { children: React.ReactNode; color: string }) {
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase border"
+      style={{
+        color,
+        backgroundColor: `${color}10`,
+        borderColor: `${color}30`,
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -40,121 +51,100 @@ export function ResultsTable({
   );
   if (!allConfirmed) return null;
 
-  // Find winner
-  const confirmed = CHAIN_IDS.filter(
-    (id) => chainStates[id]?.state === "confirmed"
-  );
+  const confirmed = CHAIN_IDS.filter((id) => chainStates[id]?.state === "confirmed");
   const winnerId = confirmed.reduce(
     (best, id) =>
-      (chainStates[id]?.elapsedMs ?? Infinity) <
-      (chainStates[best]?.elapsedMs ?? Infinity)
-        ? id
-        : best,
+      (chainStates[id]?.elapsedMs ?? Infinity) < (chainStates[best]?.elapsedMs ?? Infinity)
+        ? id : best,
     confirmed[0]
   );
 
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-zinc-800/50 bg-[#0a0a0f]">
-      <div className="px-5 py-3.5 border-b border-zinc-800/50">
-        <h3 className="text-sm font-semibold text-zinc-100">Race Results</h3>
+    <div className="w-full overflow-hidden rounded-sm border border-[var(--border)] bg-[var(--bg-surface)]">
+      <div className="px-4 py-3 border-b border-[var(--border)]">
+        <h3 className="font-mono text-[10px] uppercase tracking-[0.15em] text-[var(--text-dim)]">
+          Race Results
+        </h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-800/40 text-zinc-500">
-              <th className="px-4 py-2 text-left font-medium" />
-              {CHAIN_IDS.map((id) => (
-                <th
-                  key={id}
-                  className="px-4 py-2 text-center font-medium"
-                  style={{
-                    color:
-                      CHAIN_COLORS[id as keyof typeof CHAIN_COLORS],
-                  }}
-                >
-                  {CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]}
-                  {id === winnerId && " \u{1F3C6}"}
-                </th>
-              ))}
+            <tr className="border-b border-[var(--border)]">
+              <th className="px-4 py-2.5 text-left font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]" />
+              {CHAIN_IDS.map((id) => {
+                const color = CHAIN_COLORS[id as keyof typeof CHAIN_COLORS];
+                return (
+                  <th key={id} className="px-4 py-2.5 text-center">
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                      <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color }}>
+                        {CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]}
+                      </span>
+                      {id === winnerId && (
+                        <Pill color="var(--tempo-bright)">Winner</Pill>
+                      )}
+                    </div>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
-          <tbody className="text-zinc-300">
-            {/* Time */}
-            <tr className="border-b border-zinc-800/50">
-              <td className="px-4 py-2 text-zinc-500 font-medium">Time</td>
+          <tbody className="text-[var(--text-secondary)]">
+            <tr className="border-b border-[var(--border)]">
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Time</td>
               {CHAIN_IDS.map((id) => {
                 const cs = chainStates[id];
+                const isWinner = id === winnerId;
                 return (
-                  <td
-                    key={id}
-                    className={`px-4 py-2 text-center font-mono ${id === winnerId ? "text-emerald-400 font-bold" : ""}`}
-                  >
-                    {cs?.state === "confirmed"
-                      ? `${(cs.elapsedMs! / 1000).toFixed(2)}s`
-                      : "Failed"}
+                  <td key={id} className="px-4 py-2.5 text-center">
+                    <span className={`font-mono timer-display text-sm ${isWinner ? "text-[var(--success)] font-bold" : ""}`}>
+                      {cs?.state === "confirmed" ? `${(cs.elapsedMs! / 1000).toFixed(2)}s` : "Failed"}
+                    </span>
                   </td>
                 );
               })}
             </tr>
-
-            {/* Fee */}
-            <tr className="border-b border-zinc-800/50">
-              <td className="px-4 py-2 text-zinc-500 font-medium">Fee</td>
+            <tr className="border-b border-[var(--border)]">
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Fee</td>
               {CHAIN_IDS.map((id) => (
-                <td key={id} className="px-4 py-2 text-center font-mono">
-                  {chainStates[id]?.feeDisplay ?? "—"}
+                <td key={id} className="px-4 py-2.5 text-center font-mono text-xs">
+                  {chainStates[id]?.feeDisplay ?? "\u2014"}
                 </td>
               ))}
             </tr>
-
-            {/* Fee Token */}
-            <tr className="border-b border-zinc-800/50">
-              <td className="px-4 py-2 text-zinc-500 font-medium">Fee Token</td>
+            <tr className="border-b border-[var(--border)]">
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Fee Token</td>
               {CHAIN_IDS.map((id) => (
-                <td key={id} className="px-4 py-2 text-center">
-                  {chainStates[id]?.feeToken ?? "—"}
-                  {id === tempo.id && (
-                    <span className="ml-1 text-emerald-400 text-xs">
-                      (same token!)
-                    </span>
-                  )}
+                <td key={id} className="px-4 py-2.5 text-center">
+                  {chainStates[id]?.feeToken ? (
+                    <Pill color={id === tempo.id ? "var(--success)" : "var(--text-secondary)"}>
+                      {chainStates[id].feeToken}
+                    </Pill>
+                  ) : "\u2014"}
                 </td>
               ))}
             </tr>
-
-            {/* Finality */}
-            <tr className="border-b border-zinc-800/50">
-              <td className="px-4 py-2 text-zinc-500 font-medium">Finality</td>
-              <td className="px-4 py-2 text-center text-zinc-400">
-                ~12 min (probabilistic)
-              </td>
-              <td className="px-4 py-2 text-center text-zinc-400">
-                7-day challenge window
-              </td>
-              <td className="px-4 py-2 text-center text-emerald-400 font-medium">
-                Instant (deterministic)
+            <tr className="border-b border-[var(--border)]">
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Finality</td>
+              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">~12 min probabilistic</td>
+              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">7-day challenge</td>
+              <td className="px-4 py-2.5 text-center">
+                <Pill color="var(--success)">Instant</Pill>
               </td>
             </tr>
-
-            {/* Memo */}
-            <tr className="border-b border-zinc-800/50">
-              <td className="px-4 py-2 text-zinc-500 font-medium">Memo</td>
-              <td className="px-4 py-2 text-center text-zinc-600">N/A</td>
-              <td className="px-4 py-2 text-center text-zinc-600">N/A</td>
-              <td className="px-4 py-2 text-center text-emerald-400">
-                Native
-              </td>
+            <tr className="border-b border-[var(--border)]">
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Memo</td>
+              <td className="px-4 py-2.5 text-center"><Pill color="var(--text-dim)">N/A</Pill></td>
+              <td className="px-4 py-2.5 text-center"><Pill color="var(--text-dim)">N/A</Pill></td>
+              <td className="px-4 py-2.5 text-center"><Pill color="var(--success)">Native</Pill></td>
             </tr>
-
-            {/* Tx Hash + Explorer */}
             <tr>
-              <td className="px-4 py-2 text-zinc-500 font-medium">Explorer</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Explorer</td>
               {CHAIN_IDS.map((id) => {
                 const cs = chainStates[id];
-                const explorer =
-                  EXPLORER_URLS[id as keyof typeof EXPLORER_URLS];
+                const explorer = EXPLORER_URLS[id as keyof typeof EXPLORER_URLS];
                 return (
-                  <td key={id} className="px-4 py-2 text-center">
+                  <td key={id} className="px-4 py-2.5 text-center">
                     {cs?.hash ? (
                       <div className="flex flex-col items-center gap-1">
                         <CopyHash hash={cs.hash} />
@@ -162,15 +152,12 @@ export function ResultsTable({
                           href={`${explorer}/tx/${cs.hash}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300"
+                          className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--tempo-primary)] hover:text-[var(--tempo-bright)] transition-colors"
                         >
-                          View
-                          <ExternalLink className="size-3" />
+                          View <ExternalLink className="size-2.5" />
                         </a>
                       </div>
-                    ) : (
-                      "—"
-                    )}
+                    ) : "\u2014"}
                   </td>
                 );
               })}

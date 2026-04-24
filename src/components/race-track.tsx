@@ -13,14 +13,14 @@ const CHAIN_INITIALS: Record<number, string> = {
   [tempo.id]: "T",
 };
 
-// Layout constants — wider viewBox for label room
-const VIEWBOX_W = 820;
-const LABEL_X = 85;
-const START_X = 105;
-const FINISH_X = 720;
+const VIEWBOX_W = 860;
+const VIEWBOX_H = 300;
+const LABEL_X = 80;
+const START_X = 100;
+const FINISH_X = 760;
 const RUNNER_TRAVEL = FINISH_X - START_X;
-const TIME_X = FINISH_X + 20;
-const LANE_Y = [65, 145, 225] as const;
+const LANE_H = 80;
+const LANE_Y = [60, 140, 220] as const;
 
 function getTargetX(state: TxState): number {
   switch (state) {
@@ -29,22 +29,17 @@ function getTargetX(state: TxState): number {
     case "signed":
       return START_X;
     case "racing":
-      // Slow crawl toward 80% — never reaches finish on its own
       return START_X + RUNNER_TRAVEL * 0.8;
     case "confirmed":
       return FINISH_X;
     case "error":
-      return START_X + RUNNER_TRAVEL * 0.08;
+      return START_X + RUNNER_TRAVEL * 0.06;
   }
 }
 
 function getTransition(state: TxState) {
-  if (state === "racing") {
-    return { duration: 45, ease: "linear" as const };
-  }
-  if (state === "confirmed") {
-    return { type: "spring" as const, stiffness: 180, damping: 22, mass: 0.8 };
-  }
+  if (state === "racing") return { duration: 45, ease: "linear" as const };
+  if (state === "confirmed") return { type: "spring" as const, stiffness: 200, damping: 22, mass: 0.8 };
   return { type: "spring" as const, stiffness: 80, damping: 20 };
 }
 
@@ -60,57 +55,58 @@ function RunnerFigure({
   const isRunning = state === "racing";
   const isFinished = state === "confirmed";
   const isError = state === "error";
-  const fill = isError ? "#ef4444" : color;
-  const opacity = state === "idle" || state === "signing" ? 0.35 : 1;
-  const legDuration = 0.32;
+  const fill = isError ? "#EF4444" : color;
+  const opacity = state === "idle" || state === "signing" ? 0.25 : 1;
+  const legDuration = 0.5;
 
   return (
     <g opacity={opacity}>
-      {/* Head */}
-      <circle r="9" cy="-18" fill={fill} />
+      {/* Motion blur trail behind head */}
+      {isRunning && (
+        <g filter="url(#motionBlur)" opacity="0.3">
+          <circle r="12" cy="-20" fill={fill} />
+        </g>
+      )}
+
+      {/* Head with chain initial */}
+      <circle r="12" cy="-20" fill={fill} stroke={fill} strokeWidth="1" />
       <text
-        y="-14"
+        y="-16"
         textAnchor="middle"
         fill="white"
-        fontSize="10"
+        fontSize="12"
         fontWeight="700"
-        fontFamily="system-ui, -apple-system, sans-serif"
+        fontFamily="var(--font-dm-mono), monospace"
       >
         {initial}
       </text>
 
       {/* Torso */}
-      <line
-        x1="0" y1="-9" x2="0" y2="5"
-        stroke={fill} strokeWidth="3" strokeLinecap="round"
-      />
+      <line x1="0" y1="-8" x2="0" y2="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
 
       {/* Arms */}
       {isFinished ? (
-        // Victory pose
         <>
-          <line x1="0" y1="-5" x2="-8" y2="-15" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="0" y1="-5" x2="8" y2="-15" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="0" y1="-4" x2="-9" y2="-16" stroke={fill} strokeWidth="2" strokeLinecap="round" />
+          <line x1="0" y1="-4" x2="9" y2="-16" stroke={fill} strokeWidth="2" strokeLinecap="round" />
         </>
       ) : isRunning ? (
         <>
           <motion.line
-            x1="0" y1="-5"
-            stroke={fill} strokeWidth="2.5" strokeLinecap="round"
-            animate={{ x2: [-8, 8, -8], y2: [2, -5, 2] }}
+            x1="0" y1="-4" stroke={fill} strokeWidth="2" strokeLinecap="round"
+            animate={{ x2: [-8, 8, -8], y2: [3, -6, 3] }}
             transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
           />
           <motion.line
-            x1="0" y1="-5"
-            stroke={fill} strokeWidth="2.5" strokeLinecap="round"
-            animate={{ x2: [8, -8, 8], y2: [-5, 2, -5] }}
+            x1="0" y1="-4" stroke={fill} strokeWidth="2" strokeLinecap="round"
+            animate={{ x2: [8, -8, 8], y2: [-6, 3, -6] }}
             transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
           />
         </>
       ) : (
         <>
-          <line x1="0" y1="-5" x2="-6" y2="0" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="0" y1="-5" x2="6" y2="0" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="0" y1="-4" x2="-6" y2="1" stroke={fill} strokeWidth="2" strokeLinecap="round" />
+          <line x1="0" y1="-4" x2="6" y2="1" stroke={fill} strokeWidth="2" strokeLinecap="round" />
         </>
       )}
 
@@ -118,22 +114,20 @@ function RunnerFigure({
       {isRunning ? (
         <>
           <motion.line
-            x1="0" y1="5"
-            stroke={fill} strokeWidth="3" strokeLinecap="round"
-            animate={{ x2: [-6, 7, -6], y2: [16, 14, 16] }}
+            x1="0" y1="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round"
+            animate={{ x2: [-7, 8, -7], y2: [18, 16, 18] }}
             transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
           />
           <motion.line
-            x1="0" y1="5"
-            stroke={fill} strokeWidth="3" strokeLinecap="round"
-            animate={{ x2: [7, -6, 7], y2: [14, 16, 14] }}
+            x1="0" y1="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round"
+            animate={{ x2: [8, -7, 8], y2: [16, 18, 16] }}
             transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
           />
         </>
       ) : (
         <>
-          <line x1="0" y1="5" x2="-4" y2="16" stroke={fill} strokeWidth="3" strokeLinecap="round" />
-          <line x1="0" y1="5" x2="4" y2="16" stroke={fill} strokeWidth="3" strokeLinecap="round" />
+          <line x1="0" y1="6" x2="-4" y2="18" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
+          <line x1="0" y1="6" x2="4" y2="18" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
         </>
       )}
     </g>
@@ -146,44 +140,30 @@ export function RaceTrack({
   chainStates: Record<number, ChainRaceState>;
 }) {
   return (
-    <div className="w-full overflow-hidden rounded-2xl border border-zinc-800/50 bg-[#0a0a0f] p-5">
+    <div className="w-full overflow-hidden rounded-sm border border-[var(--border)] bg-[var(--bg-surface)]">
       <svg
-        viewBox={`0 0 ${VIEWBOX_W} 290`}
+        viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
         className="w-full h-auto"
         role="img"
-        aria-label="Race track showing transaction progress"
+        aria-label="Race track"
       >
-        {/* Track surface */}
-        <rect
-          x={START_X - 8}
-          y="28"
-          width={FINISH_X - START_X + 24}
-          height="230"
-          rx="10"
-          fill="#111118"
-          stroke="#1c1c2e"
-          strokeWidth="1"
-        />
+        <defs>
+          <filter id="motionBlur">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="8 0" />
+          </filter>
+        </defs>
 
         {/* Finish line */}
         <line
-          x1={FINISH_X + 8}
-          y1="28"
-          x2={FINISH_X + 8}
-          y2="258"
-          stroke="#2a2a3e"
-          strokeWidth="2"
-          strokeDasharray="6 4"
+          x1={FINISH_X + 10} y1="20"
+          x2={FINISH_X + 10} y2={VIEWBOX_H - 20}
+          stroke="var(--border-bright)" strokeWidth="2" strokeDasharray="6 4"
         />
         <text
-          x={FINISH_X + 8}
-          y="20"
-          textAnchor="middle"
-          fill="#3f3f5a"
-          fontSize="10"
-          fontFamily="system-ui, -apple-system, sans-serif"
-          fontWeight="600"
-          letterSpacing="0.08em"
+          x={FINISH_X + 10} y="14"
+          textAnchor="middle" fill="var(--text-dim)"
+          fontSize="9" fontFamily="var(--font-dm-mono), monospace"
+          fontWeight="500" letterSpacing="0.1em"
         >
           FINISH
         </text>
@@ -203,95 +183,77 @@ export function RaceTrack({
 
           return (
             <g key={chainId}>
-              {/* Lane track line */}
+              {/* Lane separator */}
+              {i > 0 && (
+                <line
+                  x1={START_X} y1={y - LANE_H / 2 + 10}
+                  x2={FINISH_X + 10} y2={y - LANE_H / 2 + 10}
+                  stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4"
+                />
+              )}
+
+              {/* Starting block */}
               <line
-                x1={START_X}
-                y1={y}
-                x2={FINISH_X + 8}
-                y2={y}
-                stroke="#1a1a2a"
-                strokeWidth="1"
+                x1={START_X} y1={y - 16}
+                x2={START_X} y2={y + 20}
+                stroke={color} strokeWidth="3" opacity="0.4"
               />
 
-              {/* Start marker */}
-              <line
-                x1={START_X}
-                y1={y - 12}
-                x2={START_X}
-                y2={y + 12}
-                stroke="#1f1f32"
-                strokeWidth="1"
-              />
-
-              {/* Chain label */}
+              {/* Lane label */}
               <text
-                x={LABEL_X}
-                y={y + 5}
-                textAnchor="end"
-                fill={color}
-                fontSize="14"
-                fontWeight="600"
-                fontFamily="system-ui, -apple-system, sans-serif"
+                x={LABEL_X} y={y + 4}
+                textAnchor="end" fill={color}
+                fontSize="11" fontWeight="500"
+                fontFamily="var(--font-dm-mono), monospace"
+                letterSpacing="0.05em"
+                style={{ textTransform: "uppercase" } as React.CSSProperties}
               >
                 {name}
               </text>
 
-              {/* Runner figure */}
+              {/* Runner */}
               <motion.g
                 initial={{ x: START_X, y: 0 }}
                 animate={{ x: targetX }}
                 transition={transition}
               >
                 <g transform={`translate(0, ${y})`}>
-                  <RunnerFigure
-                    color={color}
-                    initial={initial}
-                    state={state}
-                  />
+                  <RunnerFigure color={color} initial={initial} state={state} />
                 </g>
               </motion.g>
 
-              {/* Time badge — right side */}
+              {/* Time badge */}
               {(isConfirmed || isError) && (
                 <g>
                   <rect
-                    x={TIME_X}
-                    y={y - 12}
-                    width="60"
-                    height="24"
-                    rx="6"
-                    fill={isConfirmed ? "#22c55e15" : "#ef444415"}
-                    stroke={isConfirmed ? "#22c55e30" : "#ef444430"}
-                    strokeWidth="1"
+                    x={FINISH_X + 24} y={y - 10}
+                    width="70" height="22" rx="2"
+                    fill={isConfirmed ? "var(--success)" : "var(--destructive)"}
+                    opacity="0.1"
+                    stroke={isConfirmed ? "var(--success)" : "var(--destructive)"}
+                    strokeWidth="1" strokeOpacity="0.3"
                   />
                   <text
-                    x={TIME_X + 30}
-                    y={y + 4}
+                    x={FINISH_X + 59} y={y + 5}
                     textAnchor="middle"
-                    fill={isConfirmed ? "#4ade80" : "#f87171"}
-                    fontSize="12"
-                    fontWeight="600"
-                    fontFamily="ui-monospace, monospace"
+                    fill={isConfirmed ? "var(--success)" : "var(--destructive)"}
+                    fontSize="11" fontWeight="600"
+                    fontFamily="var(--font-dm-mono), monospace"
                   >
-                    {isConfirmed
-                      ? `${(cs.elapsedMs! / 1000).toFixed(1)}s`
-                      : "ERR"}
+                    {isConfirmed ? `${(cs.elapsedMs! / 1000).toFixed(2)}s` : "ERR"}
                   </text>
                 </g>
               )}
 
-              {/* Confirmed pulse ring */}
+              {/* Confirmed flash */}
               {isConfirmed && (
                 <motion.circle
-                  cx={FINISH_X}
-                  cy={y}
-                  r="14"
-                  fill="none"
-                  stroke="#22c55e"
-                  strokeWidth="1.5"
-                  initial={{ opacity: 0.7, scale: 1 }}
+                  cx={FINISH_X} cy={y}
+                  r="16" fill="none"
+                  stroke="var(--success)" strokeWidth="1.5"
+                  initial={{ opacity: 0.6, scale: 1 }}
                   animate={{ opacity: 0, scale: 2.5 }}
-                  transition={{ duration: 1.2 }}
+                  transition={{ duration: 1 }}
                 />
               )}
             </g>
