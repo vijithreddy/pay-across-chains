@@ -54,14 +54,14 @@ export function ResultsTable({
   );
 
   return (
-    <div className="w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950">
-      <div className="px-4 py-3 border-b border-zinc-800">
+    <div className="w-full overflow-hidden rounded-2xl border border-zinc-800/50 bg-[#0a0a0f]">
+      <div className="px-5 py-3.5 border-b border-zinc-800/50">
         <h3 className="text-sm font-semibold text-zinc-100">Race Results</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-zinc-800 text-zinc-500">
+            <tr className="border-b border-zinc-800/40 text-zinc-500">
               <th className="px-4 py-2 text-left font-medium" />
               {CHAIN_IDS.map((id) => (
                 <th

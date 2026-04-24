@@ -1,16 +1,11 @@
-import { defineChain, http } from "viem";
+import { http } from "viem";
 import { mainnet, base } from "wagmi/chains";
+import { tempo as tempoBase } from "viem/chains";
 
-export const tempo = defineChain({
-  id: 4217,
-  name: "Tempo",
-  nativeCurrency: { name: "USD", symbol: "USD", decimals: 18 },
-  rpcUrls: {
-    default: { http: [process.env.NEXT_PUBLIC_TEMPO_RPC || "https://rpc.tempo.xyz"] },
-  },
-  blockExplorers: {
-    default: { name: "Tempo Explorer", url: "https://explore.tempo.xyz" },
-  },
+// Use extend() to set feeToken — triggers Tempo tx type (0x76) serialization.
+// Without feeToken, transactions serialize as EIP-1559 and get stuck in "queued".
+export const tempo = tempoBase.extend({
+  feeToken: process.env.NEXT_PUBLIC_USDC_TEMPO as `0x${string}`,
 });
 
 export const chains = [mainnet, base, tempo] as const;
@@ -18,7 +13,7 @@ export const chains = [mainnet, base, tempo] as const;
 export const transports = {
   [mainnet.id]: http(process.env.NEXT_PUBLIC_ETH_RPC),
   [base.id]: http(process.env.NEXT_PUBLIC_BASE_RPC),
-  [tempo.id]: http(process.env.NEXT_PUBLIC_TEMPO_RPC || "https://rpc.tempo.xyz"),
+  [tempo.id]: http(process.env.NEXT_PUBLIC_TEMPO_RPC!),
 };
 
 // USDC contract addresses per chain
@@ -28,11 +23,11 @@ export const USDC_ADDRESSES = {
   [tempo.id]: process.env.NEXT_PUBLIC_USDC_TEMPO as `0x${string}`,
 } as const;
 
-// Minimum balances for funding gate
+// Minimum USDC balances for funding gate (sending 1 USDC per chain)
 export const MIN_BALANCES = {
-  [mainnet.id]: { amount: 0.005, label: "0.005 ETH", token: "ETH" },
-  [base.id]: { amount: 0.0001, label: "0.0001 ETH", token: "ETH" },
-  [tempo.id]: { amount: 5, label: "5 USDC", token: "USDC" },
+  [mainnet.id]: { amount: 1, label: "1 USDC", token: "USDC" },
+  [base.id]: { amount: 1, label: "1 USDC", token: "USDC" },
+  [tempo.id]: { amount: 1.5, label: "1.5 USDC", token: "USDC" },
 } as const;
 
 // Bridge/funding links

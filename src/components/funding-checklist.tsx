@@ -1,7 +1,8 @@
 "use client";
 
-import { useAccount, useBalance } from "wagmi";
-import { createPublicClient, formatEther, formatUnits } from "viem";
+import { useState, useEffect } from "react";
+import { useAccount } from "wagmi";
+import { createPublicClient, formatUnits } from "viem";
 import { mainnet, base } from "wagmi/chains";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -16,20 +17,27 @@ import {
 import { erc20Abi } from "@/lib/abi";
 import { CheckCircle2, XCircle, ExternalLink, Loader2 } from "lucide-react";
 
-// Read Tempo USDC balance via balanceOf — NEVER eth_getBalance on Tempo
-function useTempoBalance(address: `0x${string}` | undefined) {
+// Read USDC balance via balanceOf for any chain
+function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
+  const chainMap = {
+    [mainnet.id]: mainnet,
+    [base.id]: base,
+    [tempo.id]: tempo,
+  } as const;
+
   return useQuery({
-    queryKey: ["tempo-balance", address],
+    queryKey: ["usdc-balance", chainId, address],
     enabled: !!address,
     refetchInterval: 10_000,
     queryFn: async () => {
       if (!address) return 0n;
+      const chain = chainMap[chainId as keyof typeof chainMap];
       const client = createPublicClient({
-        chain: tempo,
-        transport: transports[tempo.id],
+        chain,
+        transport: transports[chainId as keyof typeof transports],
       });
       const balance = await client.readContract({
-        address: USDC_ADDRESSES[tempo.id],
+        address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
         abi: erc20Abi,
         functionName: "balanceOf",
         args: [address],
@@ -53,87 +61,70 @@ type ChainStatus = {
 
 export function FundingChecklist({
   onAllFunded,
+  tempoAddress,
 }: {
   onAllFunded: (funded: boolean) => void;
+  tempoAddress?: `0x${string}`;
 }) {
   const { address } = useAccount();
+  const [mounted, setMounted] = useState(false);
 
-  // Ethereum ETH balance via eth_getBalance
-  const ethBalance = useBalance({ address, chainId: mainnet.id });
-  // Base ETH balance via eth_getBalance
-  const baseBalance = useBalance({ address, chainId: base.id });
-  // Tempo USDC balance via token.balanceOf
-  const tempoBalance = useTempoBalance(address);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  const statuses: ChainStatus[] = [
-    {
-      chainId: mainnet.id,
-      name: CHAIN_NAMES[mainnet.id],
-      color: CHAIN_COLORS[mainnet.id],
-      funded: ethBalance.data
-        ? parseFloat(formatEther(ethBalance.data.value)) >=
-          MIN_BALANCES[mainnet.id].amount
-        : false,
-      balance: ethBalance.data
-        ? `${parseFloat(formatEther(ethBalance.data.value)).toFixed(4)} ETH`
-        : "—",
-      required: MIN_BALANCES[mainnet.id].label,
-      token: "ETH",
-      bridgeLink: BRIDGE_LINKS[mainnet.id],
-      loading: ethBalance.isLoading,
-    },
-    {
-      chainId: base.id,
-      name: CHAIN_NAMES[base.id],
-      color: CHAIN_COLORS[base.id],
-      funded: baseBalance.data
-        ? parseFloat(formatEther(baseBalance.data.value)) >=
-          MIN_BALANCES[base.id].amount
-        : false,
-      balance: baseBalance.data
-        ? `${parseFloat(formatEther(baseBalance.data.value)).toFixed(4)} ETH`
-        : "—",
-      required: MIN_BALANCES[base.id].label,
-      token: "ETH",
-      bridgeLink: BRIDGE_LINKS[base.id],
-      loading: baseBalance.isLoading,
-    },
-    {
-      chainId: tempo.id,
-      name: CHAIN_NAMES[tempo.id],
-      color: CHAIN_COLORS[tempo.id],
-      funded: tempoBalance.data
-        ? parseFloat(formatUnits(tempoBalance.data, 6)) >=
-          MIN_BALANCES[tempo.id].amount
-        : false,
-      balance:
-        tempoBalance.data !== undefined
-          ? `${parseFloat(formatUnits(tempoBalance.data, 6)).toFixed(2)} USDC`
-          : "—",
-      required: MIN_BALANCES[tempo.id].label,
-      token: "USDC",
-      bridgeLink: BRIDGE_LINKS[tempo.id],
-      loading: tempoBalance.isLoading,
-    },
+  // Eth/Base: check MetaMask address. Tempo: check Tempo Wallet address.
+  const ethUsdc = useUsdcBalance(mainnet.id, address);
+  const baseUsdc = useUsdcBalance(base.id, address);
+  const tempoUsdc = useUsdcBalance(tempo.id, tempoAddress);
+
+  const balances = [
+    { chainId: mainnet.id, query: ethUsdc },
+    { chainId: base.id, query: baseUsdc },
+    { chainId: tempo.id, query: tempoUsdc },
   ];
+
+  const statuses: ChainStatus[] = balances.map(({ chainId, query }) => {
+    const funded = query.data
+      ? parseFloat(formatUnits(query.data, 6)) >=
+        MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].amount
+      : false;
+    const balance =
+      query.data !== undefined
+        ? `${parseFloat(formatUnits(query.data, 6)).toFixed(2)} USDC`
+        : "—";
+
+    return {
+      chainId,
+      name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES],
+      color: CHAIN_COLORS[chainId as keyof typeof CHAIN_COLORS],
+      funded,
+      balance,
+      required: MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].label,
+      token: "USDC",
+      bridgeLink: BRIDGE_LINKS[chainId as keyof typeof BRIDGE_LINKS],
+      loading: query.isLoading,
+    };
+  });
 
   const allFunded = statuses.every((s) => s.funded);
 
   // Notify parent
   if (typeof onAllFunded === "function") {
-    // Use a microtask to avoid setState-during-render
     queueMicrotask(() => onAllFunded(allFunded));
   }
 
+  if (!mounted) return null;
+
   return (
     <div className="w-full space-y-3">
-      <h3 className="text-sm font-medium text-zinc-400 uppercase tracking-wider">
+      <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">
         Funding Checklist
       </h3>
       {statuses.map((s) => (
         <div
           key={s.chainId}
-          className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3"
+          className="flex items-center justify-between rounded-xl border border-zinc-800/50 bg-[#0a0a0f] px-4 py-3.5"
         >
           <div className="flex items-center gap-3">
             <div
@@ -143,7 +134,7 @@ export function FundingChecklist({
             <div>
               <div className="text-sm font-medium text-zinc-100">{s.name}</div>
               <div className="text-xs text-zinc-500">
-                Need {s.required}
+                Need &ge; {s.required}
               </div>
             </div>
           </div>

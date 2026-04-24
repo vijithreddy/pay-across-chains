@@ -1,19 +1,27 @@
 import {
   createPublicClient,
-  createWalletClient,
-  custom,
   parseUnits,
-  toHex,
   formatEther,
-  formatUnits,
   type Hash,
   type TransactionReceipt,
 } from "viem";
+import { writeContract, switchChain } from "@wagmi/core";
 import { mainnet, base } from "wagmi/chains";
+import { Actions } from "viem/tempo";
+import { Hex } from "ox";
 import { tempo, USDC_ADDRESSES, transports, CHAIN_NAMES } from "./chains";
-import { erc20Abi, tip20Abi } from "./abi";
+import { erc20Abi } from "./abi";
+import { config } from "./wagmi";
 
-export type TxState = "idle" | "broadcasting" | "pending" | "confirmed" | "error";
+type SupportedChainId = typeof mainnet.id | typeof base.id | typeof tempo.id;
+
+export type TxState =
+  | "idle"
+  | "signing"
+  | "signed"
+  | "racing"
+  | "confirmed"
+  | "error";
 
 export type ChainRaceState = {
   chainId: number;
@@ -31,24 +39,11 @@ export type ChainRaceState = {
 
 type RaceParams = {
   recipient: `0x${string}`;
-  amount: string; // e.g. "1" for 1 USDC
+  amount: string;
   memo: string;
+  tempoClient?: any; // viem Client from Tempo Wallet provider
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
-
-function getWalletClient(chainId: number) {
-  const chainMap = {
-    [mainnet.id]: mainnet,
-    [base.id]: base,
-    [tempo.id]: tempo,
-  } as const;
-  const chain = chainMap[chainId as keyof typeof chainMap];
-  if (!chain || !window.ethereum) throw new Error("No wallet");
-  return createWalletClient({
-    chain,
-    transport: custom(window.ethereum),
-  });
-}
 
 function getPublicClient(chainId: number) {
   const chainMap = {
@@ -64,102 +59,96 @@ function getPublicClient(chainId: number) {
   });
 }
 
-async function sendErc20Transfer(
-  chainId: typeof mainnet.id | typeof base.id,
-  recipient: `0x${string}`,
-  amount: bigint,
-  account: `0x${string}`,
-  onUpdate: RaceParams["onUpdate"]
-): Promise<ChainRaceState> {
-  const name = CHAIN_NAMES[chainId];
-  const startTime = performance.now();
-  onUpdate(chainId, { state: "broadcasting", startTime });
-
-  try {
-    const walletClient = getWalletClient(chainId);
-    const publicClient = getPublicClient(chainId);
-
-    const hash = await walletClient.writeContract({
-      address: USDC_ADDRESSES[chainId],
-      abi: erc20Abi,
-      functionName: "transfer",
-      args: [recipient, amount],
-      account,
-    });
-
-    onUpdate(chainId, { state: "pending", hash });
-
-    const receipt = await publicClient.waitForTransactionReceipt({ hash });
-    const endTime = performance.now();
-    const gasUsed = receipt.gasUsed;
-    const gasPrice = receipt.effectiveGasPrice;
-    const feeWei = gasUsed * gasPrice;
-    const feeDisplay = `${parseFloat(formatEther(feeWei)).toFixed(6)} ETH`;
-
-    const result: ChainRaceState = {
-      chainId,
-      name,
-      state: "confirmed",
-      hash,
-      receipt,
-      startTime,
-      endTime,
-      elapsedMs: endTime - startTime,
-      feeDisplay,
-      feeToken: "ETH",
-    };
-    onUpdate(chainId, result);
-    return result;
-  } catch (err: unknown) {
-    const endTime = performance.now();
-    const result: ChainRaceState = {
-      chainId,
-      name,
-      state: "error",
-      startTime,
-      endTime,
-      elapsedMs: endTime - startTime,
-      error: err instanceof Error ? err.message : "Unknown error",
-    };
-    onUpdate(chainId, result);
-    return result;
-  }
-}
-
-async function sendTempoTransfer(
+// Phase 1: Sign and broadcast each chain sequentially (wallet prompts one at a time)
+async function signChain(
+  chainId: SupportedChainId,
   recipient: `0x${string}`,
   amount: bigint,
   memo: string,
-  account: `0x${string}`,
+  tempoClient: any,
+  onUpdate: RaceParams["onUpdate"]
+): Promise<{ hash: Hash; broadcastTime: number }> {
+  onUpdate(chainId, { state: "signing" });
+
+  if (chainId !== tempo.id) {
+    // Switch MetaMask to the target chain (not needed for Tempo — separate wallet)
+    try {
+      await switchChain(config, { chainId } as any);
+    } catch {
+      // May throw if already on the correct chain, ignore
+    }
+  }
+
+  let hash: Hash;
+
+  if (chainId === tempo.id) {
+    // Use the Tempo SDK's native token.transfer via the Tempo Wallet client
+    // (separate from wagmi — Tempo Wallet handles type 0x76 signing)
+    console.log("[race] Tempo: tempoClient =", tempoClient);
+    console.log("[race] Tempo: tempoClient.account =", (tempoClient as any)?.account);
+    console.log("[race] Tempo: tempoClient.chain =", (tempoClient as any)?.chain?.name);
+    if (!tempoClient) throw new Error("Tempo Wallet not connected");
+    console.log("[race] Tempo: calling Actions.token.transfer...");
+    console.log("[race] Tempo: params =", { to: recipient, amount: amount.toString(), token: USDC_ADDRESSES[tempo.id] });
+    try {
+      hash = await Actions.token.transfer(tempoClient as any, {
+        to: recipient,
+        amount,
+        memo: Hex.fromString(memo),
+        token: USDC_ADDRESSES[tempo.id],
+      } as any);
+      console.log("[race] Tempo: transfer hash =", hash);
+    } catch (transferErr) {
+      console.error("[race] Tempo: Actions.token.transfer FAILED:", transferErr);
+      throw transferErr;
+    }
+  } else {
+    hash = await writeContract(config, {
+      chainId,
+      address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
+      abi: erc20Abi,
+      functionName: "transfer",
+      args: [recipient, amount],
+    } as any);
+  }
+
+  const broadcastTime = performance.now();
+  onUpdate(chainId, { state: "signed", hash });
+  return { hash, broadcastTime };
+}
+
+// Phase 2: Race — wait for all 3 receipts simultaneously, timer starts here
+async function raceConfirmation(
+  chainId: number,
+  hash: Hash,
+  raceStart: number,
   onUpdate: RaceParams["onUpdate"]
 ): Promise<ChainRaceState> {
-  const chainId = tempo.id;
-  const name = CHAIN_NAMES[chainId];
-  const startTime = performance.now();
-  onUpdate(chainId, { state: "broadcasting", startTime });
+  const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
+  onUpdate(chainId, { state: "racing", startTime: raceStart });
 
   try {
-    const walletClient = getWalletClient(chainId);
     const publicClient = getPublicClient(chainId);
-    const memoBytes = toHex(memo, { size: 32 });
-
-    const hash = await walletClient.writeContract({
-      address: USDC_ADDRESSES[chainId],
-      abi: tip20Abi,
-      functionName: "transferWithMemo",
-      args: [recipient, amount, memoBytes],
-      account,
-    });
-
-    onUpdate(chainId, { state: "pending", hash });
-
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     const endTime = performance.now();
-    const gasUsed = receipt.gasUsed;
-    const gasPrice = receipt.effectiveGasPrice;
-    const feeWei = gasUsed * gasPrice;
-    // Tempo fees are in USDC, displayed differently
-    const feeDisplay = `${parseFloat(formatUnits(feeWei, 6)).toFixed(6)} USDC`;
+    const feeWei = receipt.gasUsed * receipt.effectiveGasPrice;
+    console.log(`[race] ${name} fee debug:`, {
+      gasUsed: receipt.gasUsed.toString(),
+      effectiveGasPrice: receipt.effectiveGasPrice.toString(),
+      feeWei: feeWei.toString(),
+      formatted: formatEther(feeWei),
+    });
+
+    let feeDisplay: string;
+    let feeToken: string;
+    if (chainId === tempo.id) {
+      // Tempo fees are in USDC (6 decimals), gasPrice is in USDC-wei (18 decimals)
+      feeDisplay = `${parseFloat(formatEther(feeWei)).toFixed(6)} USDC`;
+      feeToken = "USDC";
+    } else {
+      feeDisplay = `${parseFloat(formatEther(feeWei)).toFixed(6)} ETH`;
+      feeToken = "ETH";
+    }
 
     const result: ChainRaceState = {
       chainId,
@@ -167,11 +156,11 @@ async function sendTempoTransfer(
       state: "confirmed",
       hash,
       receipt,
-      startTime,
+      startTime: raceStart,
       endTime,
-      elapsedMs: endTime - startTime,
+      elapsedMs: endTime - raceStart,
       feeDisplay,
-      feeToken: "USDC",
+      feeToken,
     };
     onUpdate(chainId, result);
     return result;
@@ -181,9 +170,10 @@ async function sendTempoTransfer(
       chainId,
       name,
       state: "error",
-      startTime,
+      hash,
+      startTime: raceStart,
       endTime,
-      elapsedMs: endTime - startTime,
+      elapsedMs: endTime - raceStart,
       error: err instanceof Error ? err.message : "Unknown error",
     };
     onUpdate(chainId, result);
@@ -194,15 +184,47 @@ async function sendTempoTransfer(
 export async function startRace(
   params: RaceParams & { account: `0x${string}` }
 ): Promise<ChainRaceState[]> {
-  const { recipient, amount, memo, account, onUpdate } = params;
-  // USDC has 6 decimals on all chains
+  const { recipient, amount, memo, onUpdate } = params;
   const amountParsed = parseUnits(amount, 6);
 
-  const results = await Promise.allSettled([
-    sendErc20Transfer(mainnet.id, recipient, amountParsed, account, onUpdate),
-    sendErc20Transfer(base.id, recipient, amountParsed, account, onUpdate),
-    sendTempoTransfer(recipient, amountParsed, memo, account, onUpdate),
-  ]);
+  // Sign slowest chain first so it gets the most mempool time
+  // Ethereum (~12s blocks) → Base (~2s blocks) → Tempo (~500ms)
+  const signOrder = [mainnet.id, base.id, tempo.id] as const;
+  const signed: Partial<Record<number, { hash: Hash; broadcastTime: number }>> = {};
+
+  // PHASE 1: Sign each transaction sequentially
+  // User sees one wallet prompt at a time. Tx enters mempool on sign.
+  for (const chainId of signOrder) {
+    try {
+      const result = await signChain(chainId, recipient, amountParsed, memo, params.tempoClient, onUpdate);
+      signed[chainId] = result;
+    } catch (err: unknown) {
+      // User rejected or signing failed — abort entire race
+      const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
+      onUpdate(chainId, {
+        state: "error",
+        error: err instanceof Error ? err.message : "Signing rejected",
+      });
+      // Mark remaining chains as idle
+      for (const id of signOrder) {
+        if (!signed[id] && id !== chainId) {
+          onUpdate(id, { state: "idle" });
+        }
+      }
+      throw new Error(`Signing failed on ${name}: ${err instanceof Error ? err.message : "Unknown"}`);
+    }
+  }
+
+  // PHASE 2: Race for confirmations
+  // Each chain's timer starts from its broadcast moment (when the hash was received).
+  // This gives honest per-chain latency — Eth/Base don't show 0.1s just because
+  // they confirmed while the user was still signing Tempo.
+  const results = await Promise.allSettled(
+    signOrder.map((chainId) => {
+      const { hash, broadcastTime } = signed[chainId]!;
+      return raceConfirmation(chainId, hash, broadcastTime, onUpdate);
+    })
+  );
 
   return results.map((r) =>
     r.status === "fulfilled"

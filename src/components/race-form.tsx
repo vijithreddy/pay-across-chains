@@ -5,10 +5,11 @@ import { useAccount } from "wagmi";
 import { mainnet, base } from "wagmi/chains";
 import { tempo, CHAIN_NAMES, CHAIN_COLORS } from "@/lib/chains";
 import { startRace, type ChainRaceState, type TxState } from "@/lib/race-engine";
+import { useTempoWallet } from "./tempo-provider";
 import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
 import { Button } from "@/components/ui/button";
-import { Loader2, Zap } from "lucide-react";
+import { Loader2, Zap, CheckCircle2 } from "lucide-react";
 import confetti from "canvas-confetti";
 
 const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
@@ -43,12 +44,80 @@ function LiveTimer({ startTime, frozen }: { startTime?: number; frozen?: number 
   );
 }
 
-export function RaceForm({ allFunded }: { allFunded: boolean }) {
+function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceState> }) {
+  return (
+    <div className="space-y-3 rounded-2xl border border-zinc-800/50 bg-[#0a0a0f] p-5">
+      <div className="text-sm font-medium text-zinc-400 mb-3">
+        Sign each transaction — race starts after all 3 are signed
+      </div>
+      {CHAIN_IDS.map((id) => {
+        const cs = chainStates[id];
+        const color = CHAIN_COLORS[id as keyof typeof CHAIN_COLORS];
+        const name = CHAIN_NAMES[id as keyof typeof CHAIN_NAMES];
+        const isSigning = cs?.state === "signing";
+        const isSigned = cs?.state === "signed" || cs?.state === "racing" || cs?.state === "confirmed";
+
+        return (
+          <div
+            key={id}
+            className={`flex items-center justify-between rounded-xl border px-4 py-3.5 transition-colors duration-300 ${
+              isSigned
+                ? "border-emerald-500/20 bg-emerald-950/20"
+                : isSigning
+                  ? "border-purple-500/30 bg-purple-950/10"
+                  : "border-zinc-800/40 bg-zinc-900/20"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="w-3 h-3 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-sm font-medium text-zinc-200">{name}</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              {isSigning && (
+                <>
+                  <Loader2 className="size-4 animate-spin text-purple-400" />
+                  <span className="text-purple-400">Awaiting signature...</span>
+                </>
+              )}
+              {isSigned && (
+                <>
+                  <CheckCircle2 className="size-4 text-emerald-400" />
+                  <span className="text-emerald-400">Signed</span>
+                </>
+              )}
+              {!isSigning && !isSigned && cs?.state !== "error" && (
+                <span className="text-zinc-600">Waiting</span>
+              )}
+              {cs?.state === "error" && (
+                <span className="text-red-400 text-xs truncate max-w-48">
+                  {cs.error ?? "Failed"}
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function RaceForm({
+  allFunded,
+  tempoAddress,
+}: {
+  allFunded: boolean;
+  tempoAddress?: `0x${string}`;
+}) {
   const { address } = useAccount();
+  const { client: tempoClient } = useTempoWallet();
   const [recipient, setRecipient] = useState("");
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
   const [racing, setRacing] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "signing" | "racing" | "done">("idle");
   const [chainStates, setChainStates] = useState(makeInitialStates);
   const confettiFired = useRef(false);
 
@@ -58,6 +127,11 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
         ...prev,
         [chainId]: { ...prev[chainId], ...update },
       }));
+
+      // Transition to racing phase when we see the first "racing" state
+      if (update.state === "racing") {
+        setPhase("racing");
+      }
 
       // Fire confetti when Tempo confirms first
       if (update.state === "confirmed" && chainId === tempo.id && !confettiFired.current) {
@@ -75,19 +149,38 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
 
   const handleStart = async () => {
     if (!address || !recipient) return;
+    if (!tempoClient || !tempoAddress) {
+      console.error("[race-form] Cannot start race: Tempo Wallet not connected");
+      console.error("[race-form] tempoClient:", tempoClient, "tempoAddress:", tempoAddress);
+      alert("Please sign in to Tempo Wallet first");
+      return;
+    }
+    console.log("[race-form] Starting race...");
+    console.log("[race-form] EVM address:", address);
+    console.log("[race-form] tempoClient:", tempoClient);
+    console.log("[race-form] tempoClient?.account:", (tempoClient as any)?.account);
+    console.log("[race-form] tempoAddress:", tempoAddress);
     setRacing(true);
+    setPhase("signing");
     confettiFired.current = false;
     setChainStates(makeInitialStates());
 
-    await startRace({
-      recipient: recipient as `0x${string}`,
-      amount,
-      memo,
-      account: address,
-      onUpdate: handleUpdate,
-    });
+    try {
+      await startRace({
+        recipient: recipient as `0x${string}`,
+        amount,
+        memo,
+        account: address,
+        tempoClient,
+        onUpdate: handleUpdate,
+      });
+    } catch (err) {
+      console.error("[race-form] Race error:", err);
+      // Signing was rejected — stay in current state to show error
+    }
 
     setRacing(false);
+    setPhase("done");
   };
 
   const allDone = CHAIN_IDS.every(
@@ -96,13 +189,20 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
       chainStates[id]?.state === "error"
   );
 
+  const hasError = CHAIN_IDS.some((id) => chainStates[id]?.state === "error");
+  const isSigning = phase === "signing" && !allDone;
+  const isRacing = phase === "racing" && !allDone;
+
   return (
     <div className="space-y-6">
-      {/* Race Track */}
-      <RaceTrack chainStates={chainStates} />
+      {/* Signing Phase */}
+      {isSigning && <SigningStatus chainStates={chainStates} />}
 
-      {/* Live Timers */}
-      {racing && (
+      {/* Race Track — show during racing and results */}
+      {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
+
+      {/* Live Timers — only during racing phase */}
+      {isRacing && (
         <div className="grid grid-cols-3 gap-3">
           {CHAIN_IDS.map((id) => {
             const cs = chainStates[id];
@@ -111,10 +211,10 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
             return (
               <div
                 key={id}
-                className={`rounded-lg border px-4 py-3 text-center ${
+                className={`rounded-xl border px-4 py-3 text-center transition-colors duration-300 ${
                   isConfirmed
-                    ? "border-emerald-500/50 bg-emerald-500/10"
-                    : "border-zinc-800 bg-zinc-900/50"
+                    ? "border-emerald-500/20 bg-emerald-950/20"
+                    : "border-zinc-800/40 bg-[#0a0a0f]"
                 }`}
               >
                 <div
@@ -130,7 +230,7 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
                   />
                 </div>
                 <div className="text-xs text-zinc-500 mt-1 capitalize">
-                  {cs?.state ?? "idle"}
+                  {cs?.state === "racing" ? "confirming" : cs?.state ?? "idle"}
                 </div>
               </div>
             );
@@ -139,8 +239,8 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
       )}
 
       {/* Race Form */}
-      {!racing && !allDone && (
-        <div className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4">
+      {phase === "idle" && (
+        <div className="space-y-4 rounded-2xl border border-zinc-800/50 bg-[#0a0a0f] p-5">
           <div>
             <label className="block text-xs font-medium text-zinc-400 mb-1">
               Recipient Address
@@ -183,7 +283,9 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
           </Button>
           {!allFunded && (
             <p className="text-xs text-zinc-500 text-center">
-              Fund all chains above to unlock the race
+              {!tempoAddress
+                ? "Connect Tempo Wallet above to unlock the race"
+                : "Fund all chains above to unlock the race"}
             </p>
           )}
         </div>
@@ -197,6 +299,7 @@ export function RaceForm({ allFunded }: { allFunded: boolean }) {
         <Button
           onClick={() => {
             setChainStates(makeInitialStates());
+            setPhase("idle");
             confettiFired.current = false;
           }}
           variant="outline"

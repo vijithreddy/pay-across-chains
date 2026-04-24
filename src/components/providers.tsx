@@ -5,6 +5,7 @@ import { WagmiProvider } from "wagmi";
 import { RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import "@rainbow-me/rainbowkit/styles.css";
 import { config } from "@/lib/wagmi";
+import { TempoProvider } from "./tempo-provider";
 import { useState } from "react";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -19,7 +20,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             borderRadius: "medium",
           })}
         >
-          {children}
+          <TempoProvider>{children}</TempoProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
