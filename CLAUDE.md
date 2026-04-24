@@ -191,6 +191,11 @@ Dark financial terminal meets F1 race telemetry.
 - src/components/race-track.tsx — SVG track with animated stick-figure runners
 - src/components/results-table.tsx — terminal-style results with pill badges
 - src/components/funding-checklist.tsx — balance checks with chain-colored borders
+- src/components/shared-race-view.tsx — public race result page (no wallet needed)
+- src/lib/storage.ts — race result persistence (Vercel KV with in-memory fallback)
+- src/app/api/race/route.ts — POST to save race result
+- src/app/api/race/[id]/route.ts — GET to load race result
+- src/app/race/[id]/page.tsx — shareable race results page
 - src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
 - src/types/index.ts — shared types (Tab, MigrationCard)
 - evals/regression.eval.ts — 43-check regression suite (run before any changes)
@@ -200,11 +205,12 @@ Run before any code change: `npx tsx evals/regression.eval.ts`
 43 checks covering: architecture, signing flow, dual-connection isolation,
 hydration guards, timing, funding, UI components, file existence, TypeScript build.
 
-Full suite (71 checks): run all 4 eval files:
+Full suite (60+ checks): run all eval files:
 - evals/regression.eval.ts (43 checks)
 - evals/signing-flow.eval.ts (10 checks)
 - evals/dual-connection.eval.ts (14 checks)
 - evals/hydration.eval.ts (4 checks)
+- evals/race-history.eval.ts (15 checks)
 
 ## Environment Variables
 NEXT_PUBLIC_ETH_RPC

@@ -11,6 +11,26 @@ export type TempoCtx = {
   isPending: boolean;
 };
 
+/** Stored race result for persistence and sharing */
+export type RaceResult = {
+  id: string;
+  timestamp: number;
+  chains: {
+    chainId: number;
+    name: string;
+    elapsedMs: number;
+    feeDisplay: string;
+    feeToken: string;
+    hash: string;
+    state: "confirmed" | "error";
+    error?: string;
+  }[];
+  winner: string;
+  recipient: string;
+  amount: string;
+  memo: string;
+};
+
 export type MigrationCard = {
   title: string;
   description: string;

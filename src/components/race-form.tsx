@@ -14,8 +14,9 @@ import { SigningStatus } from "./signing-status";
 import { StatusCards } from "./status-cards";
 import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
-import { Zap, ArrowLeft } from "lucide-react";
+import { Zap, ArrowLeft, Check, Share2 } from "lucide-react";
 import confetti from "canvas-confetti";
+import type { RaceResult } from "@/types";
 
 const CONFETTI_CONFIG = {
   particleCount: 150,
@@ -61,6 +62,8 @@ export function RaceForm({
     "idle"
   );
   const [chainStates, setChainStates] = useState(makeInitialStates);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const confettiFired = useRef(false);
 
   /** Handles state updates from the race engine for each chain */
@@ -125,6 +128,61 @@ export function RaceForm({
     }
     setRacing(false);
     setPhase("done");
+
+    // Auto-save race result for sharing
+    saveRaceResult(recipient || DRY_RUN_RECIPIENT, amount, memo);
+  };
+
+  /** Saves the completed race to the API and generates a share URL */
+  const saveRaceResult = async (
+    raceRecipient: string,
+    raceAmount: string,
+    raceMemo: string
+  ) => {
+    try {
+      const id = crypto.randomUUID().slice(0, 8);
+      const confirmedChains = CHAIN_IDS.map((cid) => {
+        const cs = chainStates[cid];
+        return {
+          chainId: cid,
+          name: cs?.name ?? "",
+          elapsedMs: cs?.elapsedMs ?? 0,
+          feeDisplay: cs?.feeDisplay ?? "",
+          feeToken: cs?.feeToken ?? "",
+          hash: cs?.hash ?? "",
+          state: (cs?.state === "confirmed" ? "confirmed" : "error") as
+            | "confirmed"
+            | "error",
+          error: cs?.error,
+        };
+      });
+      const winner =
+        confirmedChains
+          .filter((c) => c.state === "confirmed")
+          .sort((a, b) => a.elapsedMs - b.elapsedMs)[0]?.name ?? "None";
+
+      const body: RaceResult = {
+        id,
+        timestamp: Date.now(),
+        chains: confirmedChains,
+        winner,
+        recipient: raceRecipient,
+        amount: raceAmount,
+        memo: raceMemo,
+      };
+
+      const res = await fetch("/api/race", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setShareUrl(`${window.location.origin}/race/${id}`);
+      }
+    } catch {
+      // Non-critical — race completed even if save fails
+    }
   };
 
   const allDone = CHAIN_IDS.every(
@@ -162,17 +220,42 @@ export function RaceForm({
       {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
       {isRacing && <StatusCards chainStates={chainStates} />}
       {allDone && <ResultsTable chainStates={chainStates} />}
+
+      {/* Share + Race Again buttons */}
       {allDone && (
-        <button
-          onClick={() => {
-            setChainStates(makeInitialStates());
-            setPhase("idle");
-            confettiFired.current = false;
-          }}
-          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] font-mono text-xs uppercase tracking-wider h-10 transition-all"
-        >
-          Race Again
-        </button>
+        <div className="flex gap-3">
+          {shareUrl && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex-1 rounded-xl border border-[var(--border-bright)] bg-[var(--bg-raised)] text-[var(--text-secondary)] hover:text-white text-sm font-medium h-10 transition-all flex items-center justify-center gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check className="size-4 text-[var(--success)]" /> Link Copied
+                </>
+              ) : (
+                <>
+                  <Share2 className="size-4" /> Share Results
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setChainStates(makeInitialStates());
+              setPhase("idle");
+              setShareUrl(null);
+              confettiFired.current = false;
+            }}
+            className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] text-sm font-medium h-10 transition-all"
+          >
+            Race Again
+          </button>
+        </div>
       )}
     </div>
   );

@@ -108,11 +108,16 @@ export function FundingChecklist({
       {/* RPC error banner */}
       {failedChains.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl bg-[var(--warning)]/10 border border-[var(--warning)]/20 px-4 py-3">
-          <span className="text-[var(--warning)] text-lg leading-none mt-0.5">&#x26A0;</span>
+          <span className="text-[var(--warning)] text-lg leading-none mt-0.5">
+            &#x26A0;
+          </span>
           <div>
-            <p className="text-sm font-medium text-[var(--warning)]">RPC endpoints unavailable</p>
+            <p className="text-sm font-medium text-[var(--warning)]">
+              RPC endpoints unavailable
+            </p>
             <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              Could not reach {failedChains.join(", ")}. Check your RPC configuration or try again.
+              Could not reach {failedChains.join(", ")}. Check your RPC
+              configuration or try again.
             </p>
           </div>
         </div>
@@ -168,7 +173,9 @@ export function FundingChecklist({
                 {s.loading ? (
                   <div className="h-4 w-20 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
                 ) : s.error ? (
-                  <span className="text-xs text-[var(--text-dim)]">Unavailable</span>
+                  <span className="text-xs text-[var(--text-dim)]">
+                    Unavailable
+                  </span>
                 ) : (
                   <>
                     <span className="font-mono text-sm text-white tabular-nums">
