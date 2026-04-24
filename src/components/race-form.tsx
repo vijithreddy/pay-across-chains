@@ -61,6 +61,7 @@ export function RaceForm({
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
   const [sponsored, setSponsored] = useState(false);
+  const [raceError, setRaceError] = useState<string | null>(null);
   const [racing, setRacing] = useState(false);
   const [phase, setPhase] = useState<
     "idle" | "signing" | "waiting" | "racing" | "done"
@@ -105,6 +106,7 @@ export function RaceForm({
     }
     setRacing(true);
     setPhase("signing");
+    setRaceError(null);
     confettiFired.current = false;
     setChainStates(makeInitialStates());
     let raceResults: ChainRaceState[] = [];
@@ -132,9 +134,10 @@ export function RaceForm({
         });
       }
     } catch (err) {
-      // Race can fail if user rejects a wallet prompt or RPC is down
-      if (process.env.NODE_ENV === "development")
-        console.error("[race] Error:", err);
+      // Show error visually — don't swallow silently
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setRaceError(msg);
+      console.error("[race] Error:", err);
     }
     setRacing(false);
     setPhase("done");
@@ -243,6 +246,16 @@ export function RaceForm({
           </p>
           <p className="text-xs text-[var(--text-dim)]">
             Race replay starts once all transactions confirm
+          </p>
+        </div>
+      )}
+
+      {/* Error banner — shows the actual error instead of swallowing silently */}
+      {raceError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 space-y-1">
+          <p className="text-sm font-medium text-red-400">Race failed</p>
+          <p className="text-xs text-red-400/80 font-mono break-all">
+            {raceError}
           </p>
         </div>
       )}
