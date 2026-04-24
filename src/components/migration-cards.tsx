@@ -115,15 +115,23 @@ function CodeBlock({
       <div className="relative">
         <CopyButton text={code} />
         <pre className="p-3 text-[11px] leading-relaxed overflow-x-auto" style={{ fontFamily: "var(--font-jetbrains-mono), monospace" }}>
-          {lines.map((line, i) => (
-            <div
-              key={i}
-              className="-mx-3 px-3"
-              style={highlights.includes(i) ? { backgroundColor: highlightBg } : undefined}
-            >
-              <code className="text-[var(--text-secondary)]">{line}</code>
-            </div>
-          ))}
+          {lines.map((line, i) => {
+            const isHL = highlights.includes(i);
+            const barColor = side === "evm" ? "#EF4444" : "#10B981";
+            return (
+              <div
+                key={i}
+                className="-mx-3 px-3"
+                style={isHL ? {
+                  backgroundColor: highlightBg,
+                  borderLeft: `3px solid ${barColor}`,
+                  paddingLeft: "9px",
+                } : undefined}
+              >
+                <code className="text-[var(--text-secondary)]">{line}</code>
+              </div>
+            );
+          })}
         </pre>
       </div>
     </div>

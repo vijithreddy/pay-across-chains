@@ -4,11 +4,11 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { mainnet, base } from "wagmi/chains";
 import { tempo, CHAIN_NAMES, CHAIN_COLORS } from "@/lib/chains";
-import { startRace, type ChainRaceState, type TxState } from "@/lib/race-engine";
+import { startRace, startDryRace, type ChainRaceState, type TxState } from "@/lib/race-engine";
 import { useTempoWallet } from "./tempo-provider";
 import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
-import { Loader2, Zap, CheckCircle2 } from "lucide-react";
+import { Loader2, Zap, CheckCircle2, ArrowLeft } from "lucide-react";
 import confetti from "canvas-confetti";
 
 const CHAIN_IDS = [mainnet.id, base.id, tempo.id] as const;
@@ -107,9 +107,13 @@ function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceS
 export function RaceForm({
   allFunded,
   tempoAddress,
+  onBack,
+  dryRun,
 }: {
   allFunded: boolean;
   tempoAddress?: `0x${string}`;
+  onBack?: () => void;
+  dryRun?: boolean;
 }) {
   const { address } = useAccount();
   const { client: tempoClient } = useTempoWallet();
@@ -130,20 +134,15 @@ export function RaceForm({
       if (update.state === "racing") setPhase("racing");
       if (update.state === "confirmed" && chainId === tempo.id && !confettiFired.current) {
         confettiFired.current = true;
-        confetti({
-          particleCount: 150,
-          spread: 80,
-          origin: { y: 0.4 },
-          colors: ["#7C3AED", "#A78BFA"],
-        });
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.4 }, colors: ["#7C3AED", "#A78BFA"] });
       }
     },
     []
   );
 
   const handleStart = async () => {
-    if (!address || !recipient) return;
-    if (!tempoClient || !tempoAddress) {
+    if (!dryRun && (!address || !recipient)) return;
+    if (!dryRun && (!tempoClient || !tempoAddress)) {
       alert("Please sign in to Tempo Wallet first");
       return;
     }
@@ -152,14 +151,23 @@ export function RaceForm({
     confettiFired.current = false;
     setChainStates(makeInitialStates());
     try {
-      await startRace({
-        recipient: recipient as `0x${string}`,
-        amount,
-        memo,
-        account: address,
-        tempoClient,
-        onUpdate: handleUpdate,
-      });
+      if (dryRun) {
+        await startDryRace({
+          recipient: (recipient || "0xDEAD000000000000000000000000000000000000") as `0x${string}`,
+          amount,
+          memo,
+          onUpdate: handleUpdate,
+        });
+      } else {
+        await startRace({
+          recipient: recipient as `0x${string}`,
+          amount,
+          memo,
+          account: address!,
+          tempoClient,
+          onUpdate: handleUpdate,
+        });
+      }
     } catch (err) {
       console.error("[race] Error:", err);
     }
@@ -175,7 +183,68 @@ export function RaceForm({
 
   return (
     <div className="space-y-4">
+      {/* Back button */}
+      {phase === "idle" && onBack && (
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] hover:text-[var(--text-secondary)] transition-colors"
+        >
+          <ArrowLeft className="size-3" /> Back to checklist
+        </button>
+      )}
+
+      {/* Compact payment form — single row */}
+      {phase === "idle" && (
+        <div className="space-y-3">
+          <div className="grid grid-cols-[1fr_120px_1fr] gap-2">
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                Recipient
+              </label>
+              <input
+                type="text"
+                value={recipient}
+                onChange={(e) => setRecipient(e.target.value)}
+                placeholder="0x..."
+                className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                Amount
+              </label>
+              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono">
+                {amount} USDC
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1">
+                Memo
+                <span className="ml-1.5 px-1.5 py-0.5 rounded-sm text-[8px] bg-[var(--tempo-dim)] text-[var(--tempo-bright)] border border-[var(--tempo-primary)]/30">
+                  TEMPO EXCLUSIVE
+                </span>
+              </label>
+              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono truncate">
+                {memo}
+              </div>
+            </div>
+          </div>
+
+          <button
+            onClick={handleStart}
+            disabled={!allFunded || !recipient || racing}
+            className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+          >
+            <Zap className="size-4" />
+            Send on All Three
+          </button>
+        </div>
+      )}
+
+      {/* Signing phase */}
       {isSigning && <SigningStatus chainStates={chainStates} />}
+
+      {/* Race track */}
       {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
 
       {/* Status cards during racing */}
@@ -214,60 +283,10 @@ export function RaceForm({
         </div>
       )}
 
-      {/* Race Form */}
-      {phase === "idle" && (
-        <div className="space-y-4 rounded-sm border border-[var(--border)] bg-[var(--bg-surface)] p-4">
-          <div>
-            <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
-              Recipient Address
-            </label>
-            <input
-              type="text"
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              placeholder="0x..."
-              className="w-full rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
-                Amount
-              </label>
-              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono">
-                {amount} USDC
-              </div>
-            </div>
-            <div>
-              <label className="block text-[10px] font-mono uppercase tracking-wider text-[var(--text-dim)] mb-1.5">
-                Memo (Tempo only)
-              </label>
-              <div className="rounded-sm border border-[var(--border)] bg-[var(--bg-base)] px-3 py-2 text-sm text-[var(--text-secondary)] font-mono truncate">
-                {memo}
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleStart}
-            disabled={!allFunded || !recipient || racing}
-            className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            <Zap className="size-4" />
-            Send on All Three
-          </button>
-          {!allFunded && (
-            <p className="text-[10px] font-mono text-[var(--text-dim)] text-center uppercase tracking-wider">
-              {!tempoAddress
-                ? "Connect Tempo Wallet to unlock"
-                : "Fund all chains to unlock"}
-            </p>
-          )}
-        </div>
-      )}
-
+      {/* Results */}
       {allDone && <ResultsTable chainStates={chainStates} />}
 
+      {/* Race again */}
       {allDone && (
         <button
           onClick={() => {

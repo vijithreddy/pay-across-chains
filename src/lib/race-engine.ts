@@ -237,3 +237,106 @@ export async function startRace(
         }
   );
 }
+
+// ============================================
+// DRY RACE — mock timing, no real transactions
+// ============================================
+
+const MOCK_TIMINGS: Record<number, number> = {
+  [mainnet.id]: 44000,
+  [base.id]: 2800,
+  [tempo.id]: 480,
+};
+
+const MOCK_FEES: Record<number, { display: string; token: string }> = {
+  [mainnet.id]: { display: "0.000118 ETH", token: "ETH" },
+  [base.id]: { display: "0.000001 ETH", token: "ETH" },
+  [tempo.id]: { display: "0.001026 USDC", token: "USDC" },
+};
+
+const MOCK_HASHES: Record<number, Hash> = {
+  [mainnet.id]: "0xaaa1111111111111111111111111111111111111111111111111111111111111" as Hash,
+  [base.id]: "0xbbb2222222222222222222222222222222222222222222222222222222222222" as Hash,
+  [tempo.id]: "0xccc3333333333333333333333333333333333333333333333333333333333333" as Hash,
+};
+
+export async function startDryRace(
+  params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate">
+): Promise<ChainRaceState[]> {
+  const { recipient, amount, memo, onUpdate } = params;
+  const signOrder = [mainnet.id, base.id, tempo.id] as const;
+
+  console.log("[dry-race] ============ DRY RACE START ============");
+  console.log("[dry-race] Recipient:", recipient);
+  console.log("[dry-race] Amount:", amount, "USDC");
+  console.log("[dry-race] Memo:", memo);
+
+  // PHASE 1: Simulate signing (500ms per chain)
+  for (const chainId of signOrder) {
+    const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
+    onUpdate(chainId, { state: "signing" });
+    console.log(`[dry-race] ${name}: signing... (would call ${chainId === tempo.id ? "Actions.token.transfer" : "writeContract"})`);
+
+    if (chainId === tempo.id) {
+      console.log(`[dry-race] ${name}: Actions.token.transfer(tempoClient, {`);
+      console.log(`[dry-race]   to: "${recipient}",`);
+      console.log(`[dry-race]   amount: parseUnits("${amount}", 6),`);
+      console.log(`[dry-race]   memo: Hex.fromString("${memo}"),`);
+      console.log(`[dry-race]   token: "${USDC_ADDRESSES[tempo.id]}",`);
+      console.log(`[dry-race] })`);
+    } else {
+      console.log(`[dry-race] ${name}: writeContract(config, {`);
+      console.log(`[dry-race]   chainId: ${chainId},`);
+      console.log(`[dry-race]   address: "${USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES]}",`);
+      console.log(`[dry-race]   abi: erc20Abi,`);
+      console.log(`[dry-race]   functionName: "transfer",`);
+      console.log(`[dry-race]   args: ["${recipient}", parseUnits("${amount}", 6)],`);
+      console.log(`[dry-race] })`);
+    }
+
+    await new Promise((r) => setTimeout(r, 500));
+    onUpdate(chainId, { state: "signed", hash: MOCK_HASHES[chainId] });
+    console.log(`[dry-race] ${name}: signed -> hash ${MOCK_HASHES[chainId].slice(0, 10)}...`);
+  }
+
+  // PHASE 2: Simulate confirmations
+  console.log("[dry-race] All signed. Starting race...");
+  const raceStart = performance.now();
+
+  const promises = signOrder.map((chainId) => {
+    const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
+    const delay = MOCK_TIMINGS[chainId];
+    const fee = MOCK_FEES[chainId];
+    const hash = MOCK_HASHES[chainId];
+
+    onUpdate(chainId, { state: "racing", startTime: raceStart });
+
+    return new Promise<ChainRaceState>((resolve) => {
+      setTimeout(() => {
+        const endTime = performance.now();
+        console.log(`[dry-race] ${name}: confirmed in ${delay}ms (mock)`);
+        const result: ChainRaceState = {
+          chainId,
+          name,
+          state: "confirmed",
+          hash,
+          startTime: raceStart,
+          endTime,
+          elapsedMs: endTime - raceStart,
+          feeDisplay: fee.display,
+          feeToken: fee.token,
+        };
+        onUpdate(chainId, result);
+        resolve(result);
+      }, delay);
+    });
+  });
+
+  const results = await Promise.all(promises);
+  console.log("[dry-race] ============ DRY RACE COMPLETE ============");
+  console.log("[dry-race] Results:");
+  for (const r of results) {
+    console.log(`[dry-race]   ${r.name}: ${(r.elapsedMs! / 1000).toFixed(2)}s | ${r.feeDisplay} | ${r.feeToken}`);
+  }
+  return results;
+}
