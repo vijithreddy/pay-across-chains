@@ -99,16 +99,12 @@
   --radius: 0.25rem;
 }
 
-/* Dot grid background */
-.dot-grid {
-  background-image: radial-gradient(circle, #1E273320 1px, transparent 1px);
-  background-size: 24px 24px;
-  animation: drift 60s linear infinite;
-}
-
-@keyframes drift {
-  0% { background-position: 0 0; }
-  100% { background-position: 24px 24px; }
+/* Diagonal grid background — subtle depth pattern */
+.diagonal-grid {
+  background-image:
+    linear-gradient(45deg, #1E273308 1px, transparent 1px),
+    linear-gradient(-45deg, #1E273308 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 /* Glass morphism card */

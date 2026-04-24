@@ -7,10 +7,23 @@ import { FundingChecklist } from "@/components/funding-checklist";
 import { RaceForm } from "@/components/race-form";
 import { MigrationCards } from "@/components/migration-cards";
 import { TempoConnect } from "@/components/tempo-connect";
+import { RaceTrack } from "@/components/race-track";
 import { useTempoWallet } from "@/components/tempo-provider";
 import { Zap } from "lucide-react";
+import { mainnet, base } from "wagmi/chains";
+import { tempo } from "viem/chains";
+import type { ChainRaceState } from "@/lib/race-engine";
 
 type Tab = "race" | "migration";
+
+// Idle states for the hero preview track
+function makeIdleStates(): Record<number, ChainRaceState> {
+  return {
+    [mainnet.id]: { chainId: mainnet.id, name: "Ethereum", state: "idle" },
+    [base.id]: { chainId: base.id, name: "Base", state: "idle" },
+    [tempo.id]: { chainId: tempo.id, name: "Tempo", state: "idle" },
+  };
+}
 
 export default function Home() {
   const { isConnected } = useAccount();
@@ -29,6 +42,7 @@ export default function Home() {
   }, []);
 
   const bothConnected = isConnected && !!tempoAddress;
+  const showHero = !mounted || (!isConnected && !dryRun);
 
   return (
     <div className="flex flex-col flex-1">
@@ -41,29 +55,30 @@ export default function Home() {
               Pay Across Chains
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            {/* Tempo account pill */}
-            {mounted && tempoAddress && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)] bg-[var(--tempo-dim)]">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--tempo-primary)] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--tempo-primary)]" />
-                </span>
-                <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-bright)]">
-                  Tempo
-                </span>
-                <span className="font-mono text-[10px] text-[var(--text-dim)]">
-                  {tempoAddress.slice(0, 6)}...{tempoAddress.slice(-4)}
-                </span>
-              </div>
-            )}
-            {/* RainbowKit MetaMask button */}
-            <ConnectButton
-              showBalance={false}
-              chainStatus="icon"
-              accountStatus="address"
-            />
-          </div>
+          {/* Hide wallet buttons on hero screen */}
+          {!showHero && (
+            <div className="flex items-center gap-3">
+              {mounted && tempoAddress && (
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)] bg-[var(--tempo-dim)]">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--tempo-primary)] opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--tempo-primary)]" />
+                  </span>
+                  <span className="font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-bright)]">
+                    Tempo
+                  </span>
+                  <span className="font-mono text-[10px] text-[var(--text-dim)]">
+                    {tempoAddress.slice(0, 6)}...{tempoAddress.slice(-4)}
+                  </span>
+                </div>
+              )}
+              <ConnectButton
+                showBalance={false}
+                chainStatus="icon"
+                accountStatus="address"
+              />
+            </div>
+          )}
         </div>
       </header>
 
@@ -90,35 +105,64 @@ export default function Home() {
       <main className="flex-1 px-4">
         <div className="mx-auto max-w-5xl py-8">
           {activeTab === "race" ? (
-            !mounted || (!isConnected && !dryRun) ? (
-              /* Hero — not connected */
-              <div
-                className="relative flex flex-col items-center justify-center py-32 text-center rounded-sm"
-                style={{
-                  background: "radial-gradient(ellipse at center, var(--tempo-dim) 0%, var(--bg-base) 70%)",
-                }}
-              >
-                <div className="glass-card rounded-sm px-12 py-10 max-w-lg mx-auto space-y-6">
-                  <h1 className="font-mono text-2xl font-medium tracking-[0.2em] uppercase text-[var(--text-primary)]">
-                    Pay Across Chains
-                  </h1>
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    One payment. Three chains. One winner.
-                  </p>
-                  <button
-                    onClick={() => {
-                      const btn = document.querySelector("[data-testid='rk-connect-button']") as HTMLButtonElement;
-                      btn?.click();
-                    }}
-                    className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-xs uppercase tracking-wider py-3 transition-all"
-                  >
-                    Connect Wallet
-                  </button>
-                  {/* Hidden RainbowKit button */}
-                  <div className="hidden"><ConnectButton /></div>
-                  <p className="text-[10px] text-[var(--text-dim)] font-mono">
-                    Real mainnet transactions &middot; Real fees &middot; Real explorer links
-                  </p>
+            showHero ? (
+              /* ========== HERO — SPLIT LAYOUT ========== */
+              <div className="diagonal-grid min-h-[70vh] flex items-center">
+                <div className="w-full grid grid-cols-1 lg:grid-cols-[1fr_0.7fr] gap-12 items-center">
+                  {/* Left: Introduction */}
+                  <div className="space-y-6">
+                    {/* Eyebrow */}
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--success)] opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--success)]" />
+                      </span>
+                      <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[var(--success)]">
+                        Mainnet &middot; Live
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <h1 className="font-mono text-3xl lg:text-4xl font-medium tracking-[0.15em] uppercase text-[var(--text-primary)] leading-tight">
+                      Pay Across<br />Chains
+                    </h1>
+
+                    {/* Subtitle */}
+                    <p className="text-sm text-[var(--text-secondary)]">
+                      Same payment. Ethereum. Base. Tempo. Watch who wins.
+                    </p>
+
+                    {/* Chain badges */}
+                    <div className="flex gap-2">
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--eth-primary)]/30 bg-[var(--eth-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--eth-primary)]">
+                        <span>&#x2B21;</span> Ethereum
+                      </span>
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--base-primary)]/30 bg-[var(--base-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--base-primary)]">
+                        <span>&#x25CE;</span> Base
+                      </span>
+                      <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-sm border border-[var(--tempo-primary)]/30 bg-[var(--tempo-dim)] font-mono text-[10px] uppercase tracking-wider text-[var(--tempo-primary)]">
+                        <span>&#x26A1;</span> Tempo
+                      </span>
+                    </div>
+
+                    {/* Connect button */}
+                    <button
+                      onClick={() => {
+                        const btn = document.querySelector("[data-testid='rk-connect-button']") as HTMLButtonElement;
+                        btn?.click();
+                      }}
+                      className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-xs uppercase tracking-[0.15em] py-3.5 transition-all"
+                    >
+                      Connect Wallet to Start &rarr;
+                    </button>
+                    {/* Hidden RainbowKit button */}
+                    <div className="hidden"><ConnectButton /></div>
+                  </div>
+
+                  {/* Right: Idle race track preview */}
+                  <div className="hidden lg:block opacity-40">
+                    <RaceTrack chainStates={makeIdleStates()} />
+                  </div>
                 </div>
               </div>
             ) : !raceStarted && !dryRun ? (
