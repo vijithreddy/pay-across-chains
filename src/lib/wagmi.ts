@@ -1,6 +1,6 @@
 "use client";
 
-import { createConfig, http } from "wagmi";
+import { createConfig } from "wagmi";
 import { mainnet, base } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
@@ -15,7 +15,12 @@ const connectors = connectorsForWallets(
   [
     {
       groupName: "Wallets",
-      wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet, injectedWallet],
+      wallets: [
+        metaMaskWallet,
+        coinbaseWallet,
+        walletConnectWallet,
+        injectedWallet,
+      ],
     },
   ],
   {
@@ -27,7 +32,7 @@ const connectors = connectorsForWallets(
 export const config = createConfig({
   chains: [mainnet, base, tempo] as unknown as readonly [
     typeof mainnet,
-    ...typeof mainnet[],
+    ...(typeof mainnet)[],
   ],
   connectors,
   // CRITICAL: disable EIP-6963 auto-discovery so the accounts SDK's

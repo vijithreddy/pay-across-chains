@@ -82,8 +82,10 @@ async function signChain(
   if (chainId !== tempo.id) {
     // Switch MetaMask to the target chain (not needed for Tempo — separate wallet)
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wagmi v2 types don't infer extended chain IDs
-      await (switchChain as Function)(config, { chainId });
+      // wagmi v2 types don't infer extended chain IDs from tempo.extend()
+      await (switchChain as (...args: unknown[]) => Promise<unknown>)(config, {
+        chainId,
+      });
     } catch {
       // May throw if already on the correct chain, ignore
     }
@@ -95,22 +97,27 @@ async function signChain(
     // Use the Tempo SDK's native token.transfer via the Tempo Wallet client
     // (separate from wagmi — Tempo Wallet handles type 0x76 signing)
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- viem/tempo Actions type expects a broader Client type
-    hash = await (Actions.token.transfer as Function)(tempoClient, {
+    // viem/tempo Actions type expects a broader Client type than our TempoWalletClient
+    hash = await (
+      Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
+    )(tempoClient, {
       to: recipient,
       amount,
       memo: Hex.fromString(memo),
       token: USDC_ADDRESSES[tempo.id],
     });
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- wagmi v2 types don't infer extended chain IDs
-    hash = await (writeContract as Function)(config, {
-      chainId,
-      address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
-      abi: erc20Abi,
-      functionName: "transfer",
-      args: [recipient, amount],
-    });
+    // wagmi v2 types don't infer extended chain IDs from tempo.extend()
+    hash = await (writeContract as (...args: unknown[]) => Promise<Hash>)(
+      config,
+      {
+        chainId,
+        address: USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES],
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [recipient, amount],
+      }
+    );
   }
 
   const broadcastTime = performance.now();
@@ -187,13 +194,21 @@ export async function startRace(
   // Sign slowest chain first so it gets the most mempool time
   // Ethereum (~12s blocks) → Base (~2s blocks) → Tempo (~500ms)
   const signOrder = [mainnet.id, base.id, tempo.id] as const;
-  const signed: Partial<Record<number, { hash: Hash; broadcastTime: number }>> = {};
+  const signed: Partial<Record<number, { hash: Hash; broadcastTime: number }>> =
+    {};
 
   // PHASE 1: Sign each transaction sequentially
   // User sees one wallet prompt at a time. Tx enters mempool on sign.
   for (const chainId of signOrder) {
     try {
-      const result = await signChain(chainId, recipient, amountParsed, memo, params.tempoClient, onUpdate);
+      const result = await signChain(
+        chainId,
+        recipient,
+        amountParsed,
+        memo,
+        params.tempoClient,
+        onUpdate
+      );
       signed[chainId] = result;
     } catch (err: unknown) {
       // User rejected or signing failed — abort entire race
@@ -208,7 +223,9 @@ export async function startRace(
           onUpdate(id, { state: "idle" });
         }
       }
-      throw new Error(`Signing failed on ${name}: ${err instanceof Error ? err.message : "Unknown"}`);
+      throw new Error(
+        `Signing failed on ${name}: ${err instanceof Error ? err.message : "Unknown"}`
+      );
     }
   }
 
@@ -253,9 +270,12 @@ const MOCK_FEES: Record<number, { display: string; token: string }> = {
 };
 
 const MOCK_HASHES: Record<number, Hash> = {
-  [mainnet.id]: "0xaaa1111111111111111111111111111111111111111111111111111111111111" as Hash,
-  [base.id]: "0xbbb2222222222222222222222222222222222222222222222222222222222222" as Hash,
-  [tempo.id]: "0xccc3333333333333333333333333333333333333333333333333333333333333" as Hash,
+  [mainnet.id]:
+    "0xaaa1111111111111111111111111111111111111111111111111111111111111" as Hash,
+  [base.id]:
+    "0xbbb2222222222222222222222222222222222222222222222222222222222222" as Hash,
+  [tempo.id]:
+    "0xccc3333333333333333333333333333333333333333333333333333333333333" as Hash,
 };
 
 /** Mock race with simulated timing — no real transactions, logs what calls would look like */
@@ -274,7 +294,9 @@ export async function startDryRace(
   for (const chainId of signOrder) {
     const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
     onUpdate(chainId, { state: "signing" });
-    console.log(`[dry-race] ${name}: signing... (would call ${chainId === tempo.id ? "Actions.token.transfer" : "writeContract"})`);
+    console.log(
+      `[dry-race] ${name}: signing... (would call ${chainId === tempo.id ? "Actions.token.transfer" : "writeContract"})`
+    );
 
     if (chainId === tempo.id) {
       console.log(`[dry-race] ${name}: Actions.token.transfer(tempoClient, {`);
@@ -286,16 +308,22 @@ export async function startDryRace(
     } else {
       console.log(`[dry-race] ${name}: writeContract(config, {`);
       console.log(`[dry-race]   chainId: ${chainId},`);
-      console.log(`[dry-race]   address: "${USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES]}",`);
+      console.log(
+        `[dry-race]   address: "${USDC_ADDRESSES[chainId as keyof typeof USDC_ADDRESSES]}",`
+      );
       console.log(`[dry-race]   abi: erc20Abi,`);
       console.log(`[dry-race]   functionName: "transfer",`);
-      console.log(`[dry-race]   args: ["${recipient}", parseUnits("${amount}", 6)],`);
+      console.log(
+        `[dry-race]   args: ["${recipient}", parseUnits("${amount}", 6)],`
+      );
       console.log(`[dry-race] })`);
     }
 
     await new Promise((r) => setTimeout(r, 500));
     onUpdate(chainId, { state: "signed", hash: MOCK_HASHES[chainId] });
-    console.log(`[dry-race] ${name}: signed -> hash ${MOCK_HASHES[chainId].slice(0, 10)}...`);
+    console.log(
+      `[dry-race] ${name}: signed -> hash ${MOCK_HASHES[chainId].slice(0, 10)}...`
+    );
   }
 
   // PHASE 2: Simulate confirmations
@@ -335,7 +363,9 @@ export async function startDryRace(
   console.log("[dry-race] ============ DRY RACE COMPLETE ============");
   console.log("[dry-race] Results:");
   for (const r of results) {
-    console.log(`[dry-race]   ${r.name}: ${(r.elapsedMs! / 1000).toFixed(2)}s | ${r.feeDisplay} | ${r.feeToken}`);
+    console.log(
+      `[dry-race]   ${r.name}: ${(r.elapsedMs! / 1000).toFixed(2)}s | ${r.feeDisplay} | ${r.feeToken}`
+    );
   }
   return results;
 }

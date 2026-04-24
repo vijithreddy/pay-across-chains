@@ -274,3 +274,12 @@ VERCEL_TOKEN
   // State 1: / State 2: / State 3: describing the condition
 - stopPropagation and preventDefault: always comment why
 - Any slice/substring on an address: comment the display convention
+
+## Tooling
+- ESLint enforces code quality — runs automatically via hook after every edit
+- Prettier enforces formatting — `npm run format`
+- TypeScript strict mode — noImplicitAny, noUnusedLocals, noUnusedParameters
+- /lint-readability covers architecture and chain gotchas only
+- `npm run lint` must pass before every /summarize
+- `npm run typecheck` must pass before every /summarize
+- Post-edit hook runs both typecheck + lint:check automatically

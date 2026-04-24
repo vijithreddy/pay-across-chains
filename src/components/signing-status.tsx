@@ -1,11 +1,20 @@
 "use client";
 
-import { CHAIN_IDS, CHAIN_NAMES, CHAIN_COLORS, CHAIN_BORDER_CLASSES } from "@/lib/chains";
+import {
+  CHAIN_IDS,
+  CHAIN_NAMES,
+  CHAIN_COLORS,
+  CHAIN_BORDER_CLASSES,
+} from "@/lib/chains";
 import type { ChainRaceState } from "@/lib/race-engine";
 import { Loader2, CheckCircle2 } from "lucide-react";
 
 /** Shows per-chain signing progress during the wallet prompt phase */
-export function SigningStatus({ chainStates }: { chainStates: Record<number, ChainRaceState> }) {
+export function SigningStatus({
+  chainStates,
+}: {
+  chainStates: Record<number, ChainRaceState>;
+}) {
   return (
     <div className="space-y-2 border border-[var(--border)] rounded-sm bg-[var(--bg-surface)] p-4">
       <div className="text-[10px] font-mono uppercase tracking-[0.15em] text-[var(--text-dim)] mb-3">
@@ -16,7 +25,10 @@ export function SigningStatus({ chainStates }: { chainStates: Record<number, Cha
         const color = CHAIN_COLORS[id as keyof typeof CHAIN_COLORS];
         const name = CHAIN_NAMES[id as keyof typeof CHAIN_NAMES];
         const isSigning = cs?.state === "signing";
-        const isSigned = cs?.state === "signed" || cs?.state === "racing" || cs?.state === "confirmed";
+        const isSigned =
+          cs?.state === "signed" ||
+          cs?.state === "racing" ||
+          cs?.state === "confirmed";
         return (
           <div
             key={id}
@@ -29,13 +41,21 @@ export function SigningStatus({ chainStates }: { chainStates: Record<number, Cha
             }`}
           >
             <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-              <span className="text-sm font-mono text-[var(--text-primary)]">{name}</span>
+              <div
+                className="w-2 h-2 rounded-full"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-sm font-mono text-[var(--text-primary)]">
+                {name}
+              </span>
             </div>
             <div className="flex items-center gap-2 text-xs font-mono">
               {isSigning && (
                 <>
-                  <Loader2 className="size-3.5 animate-spin" style={{ color }} />
+                  <Loader2
+                    className="size-3.5 animate-spin"
+                    style={{ color }}
+                  />
                   <span style={{ color }}>SIGNING</span>
                 </>
               )}
@@ -46,7 +66,9 @@ export function SigningStatus({ chainStates }: { chainStates: Record<number, Cha
                 </>
               )}
               {!isSigning && !isSigned && cs?.state !== "error" && (
-                <span className="text-[var(--text-dim)] uppercase">Waiting</span>
+                <span className="text-[var(--text-dim)] uppercase">
+                  Waiting
+                </span>
               )}
               {cs?.state === "error" && (
                 <span className="text-[var(--destructive)] truncate max-w-48">

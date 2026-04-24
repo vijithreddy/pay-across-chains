@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useSyncExternalStore } from "react";
 import { useAccount } from "wagmi";
 import { createPublicClient, formatUnits } from "viem";
 import { mainnet, base } from "wagmi/chains";
@@ -48,7 +48,6 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
   });
 }
 
-
 /** Shows USDC balance per chain with FUNDED/NOT FUNDED badges — gates the race start */
 export function FundingChecklist({
   onAllFunded,
@@ -58,11 +57,12 @@ export function FundingChecklist({
   tempoAddress?: `0x${string}`;
 }) {
   const { address } = useAccount();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // useSyncExternalStore avoids cascading setState-in-useEffect — false on server, true on client
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const ethUsdc = useUsdcBalance(mainnet.id, address);
   const baseUsdc = useUsdcBalance(base.id, address);
@@ -140,7 +140,8 @@ export function FundingChecklist({
             ) : (
               <>
                 <span className="font-mono text-sm text-[var(--text-primary)] timer-display">
-                  {s.balance} <span className="text-[var(--text-dim)]">USDC</span>
+                  {s.balance}{" "}
+                  <span className="text-[var(--text-dim)]">USDC</span>
                 </span>
                 {s.funded ? (
                   <span className="px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase bg-[var(--success)]/10 text-[var(--success)] border border-[var(--success)]/20">

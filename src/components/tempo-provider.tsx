@@ -50,9 +50,12 @@ export function TempoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (providerRef.current) return;
-    const isLocalhost = typeof window !== "undefined" && window.location.hostname === "localhost";
+    const isLocalhost =
+      typeof window !== "undefined" && window.location.hostname === "localhost";
     providerRef.current = Provider.create({
-      adapter: dialog({ dialog: isLocalhost ? Dialog.popup() : Dialog.iframe() }),
+      adapter: dialog({
+        dialog: isLocalhost ? Dialog.popup() : Dialog.iframe(),
+      }),
       chains: [tempo],
     });
 
@@ -92,7 +95,8 @@ export function TempoProvider({ children }: { children: ReactNode }) {
       const result = await providerRef.current.request({
         method: "wallet_connect",
       });
-      const rawAccounts = (result as Record<string, unknown>)?.accounts ?? result;
+      const rawAccounts =
+        (result as Record<string, unknown>)?.accounts ?? result;
       const addrList = Array.isArray(rawAccounts)
         ? rawAccounts.map((a: Record<string, unknown>) =>
             typeof a === "string" ? a : a.address
@@ -120,7 +124,9 @@ export function TempoProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <TempoContext.Provider value={{ address, client, signIn, signOut, isPending }}>
+    <TempoContext.Provider
+      value={{ address, client, signIn, signOut, isPending }}
+    >
       {children}
     </TempoContext.Provider>
   );

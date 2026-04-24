@@ -1,7 +1,12 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CHAIN_IDS, CHAIN_COLORS, CHAIN_NAMES, CHAIN_INITIALS } from "@/lib/chains";
+import {
+  CHAIN_IDS,
+  CHAIN_COLORS,
+  CHAIN_NAMES,
+  CHAIN_INITIALS,
+} from "@/lib/chains";
 import type { ChainRaceState, TxState } from "@/lib/race-engine";
 
 const VIEWBOX_W = 860;
@@ -32,7 +37,8 @@ function getTargetX(state: TxState): number {
 /** Returns Framer Motion transition config — slow crawl while racing, spring snap on confirm */
 function getTransition(state: TxState) {
   if (state === "racing") return { duration: 45, ease: "linear" as const };
-  if (state === "confirmed") return { type: "spring" as const, stiffness: 200, damping: 22, mass: 0.8 };
+  if (state === "confirmed")
+    return { type: "spring" as const, stiffness: 200, damping: 22, mass: 0.8 };
   return { type: "spring" as const, stiffness: 80, damping: 20 };
 }
 
@@ -76,31 +82,87 @@ function RunnerFigure({
       </text>
 
       {/* Torso */}
-      <line x1="0" y1="-8" x2="0" y2="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
+      <line
+        x1="0"
+        y1="-8"
+        x2="0"
+        y2="6"
+        stroke={fill}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
 
       {/* Arms */}
       {isFinished ? (
         <>
-          <line x1="0" y1="-4" x2="-9" y2="-16" stroke={fill} strokeWidth="2" strokeLinecap="round" />
-          <line x1="0" y1="-4" x2="9" y2="-16" stroke={fill} strokeWidth="2" strokeLinecap="round" />
+          <line
+            x1="0"
+            y1="-4"
+            x2="-9"
+            y2="-16"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <line
+            x1="0"
+            y1="-4"
+            x2="9"
+            y2="-16"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </>
       ) : isRunning ? (
         <>
           <motion.line
-            x1="0" y1="-4" stroke={fill} strokeWidth="2" strokeLinecap="round"
+            x1="0"
+            y1="-4"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
             animate={{ x2: [-8, 8, -8], y2: [3, -6, 3] }}
-            transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
+            transition={{
+              repeat: Infinity,
+              duration: legDuration,
+              ease: "easeInOut",
+            }}
           />
           <motion.line
-            x1="0" y1="-4" stroke={fill} strokeWidth="2" strokeLinecap="round"
+            x1="0"
+            y1="-4"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
             animate={{ x2: [8, -8, 8], y2: [-6, 3, -6] }}
-            transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
+            transition={{
+              repeat: Infinity,
+              duration: legDuration,
+              ease: "easeInOut",
+            }}
           />
         </>
       ) : (
         <>
-          <line x1="0" y1="-4" x2="-6" y2="1" stroke={fill} strokeWidth="2" strokeLinecap="round" />
-          <line x1="0" y1="-4" x2="6" y2="1" stroke={fill} strokeWidth="2" strokeLinecap="round" />
+          <line
+            x1="0"
+            y1="-4"
+            x2="-6"
+            y2="1"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <line
+            x1="0"
+            y1="-4"
+            x2="6"
+            y2="1"
+            stroke={fill}
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
         </>
       )}
 
@@ -108,20 +170,52 @@ function RunnerFigure({
       {isRunning ? (
         <>
           <motion.line
-            x1="0" y1="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round"
+            x1="0"
+            y1="6"
+            stroke={fill}
+            strokeWidth="2.5"
+            strokeLinecap="round"
             animate={{ x2: [-7, 8, -7], y2: [18, 16, 18] }}
-            transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
+            transition={{
+              repeat: Infinity,
+              duration: legDuration,
+              ease: "easeInOut",
+            }}
           />
           <motion.line
-            x1="0" y1="6" stroke={fill} strokeWidth="2.5" strokeLinecap="round"
+            x1="0"
+            y1="6"
+            stroke={fill}
+            strokeWidth="2.5"
+            strokeLinecap="round"
             animate={{ x2: [8, -7, 8], y2: [16, 18, 16] }}
-            transition={{ repeat: Infinity, duration: legDuration, ease: "easeInOut" }}
+            transition={{
+              repeat: Infinity,
+              duration: legDuration,
+              ease: "easeInOut",
+            }}
           />
         </>
       ) : (
         <>
-          <line x1="0" y1="6" x2="-4" y2="18" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
-          <line x1="0" y1="6" x2="4" y2="18" stroke={fill} strokeWidth="2.5" strokeLinecap="round" />
+          <line
+            x1="0"
+            y1="6"
+            x2="-4"
+            y2="18"
+            stroke={fill}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <line
+            x1="0"
+            y1="6"
+            x2="4"
+            y2="18"
+            stroke={fill}
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
         </>
       )}
     </g>
@@ -150,15 +244,23 @@ export function RaceTrack({
 
         {/* Finish line */}
         <line
-          x1={FINISH_X + 10} y1="20"
-          x2={FINISH_X + 10} y2={VIEWBOX_H - 20}
-          stroke="var(--border-bright)" strokeWidth="2" strokeDasharray="6 4"
+          x1={FINISH_X + 10}
+          y1="20"
+          x2={FINISH_X + 10}
+          y2={VIEWBOX_H - 20}
+          stroke="var(--border-bright)"
+          strokeWidth="2"
+          strokeDasharray="6 4"
         />
         <text
-          x={FINISH_X + 10} y="14"
-          textAnchor="middle" fill="var(--text-dim)"
-          fontSize="9" fontFamily="var(--font-dm-mono), monospace"
-          fontWeight="500" letterSpacing="0.1em"
+          x={FINISH_X + 10}
+          y="14"
+          textAnchor="middle"
+          fill="var(--text-dim)"
+          fontSize="9"
+          fontFamily="var(--font-dm-mono), monospace"
+          fontWeight="500"
+          letterSpacing="0.1em"
         >
           FINISH
         </text>
@@ -181,24 +283,35 @@ export function RaceTrack({
               {/* Lane separator */}
               {i > 0 && (
                 <line
-                  x1={START_X} y1={y - LANE_H / 2 + 10}
-                  x2={FINISH_X + 10} y2={y - LANE_H / 2 + 10}
-                  stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4"
+                  x1={START_X}
+                  y1={y - LANE_H / 2 + 10}
+                  x2={FINISH_X + 10}
+                  y2={y - LANE_H / 2 + 10}
+                  stroke="var(--border)"
+                  strokeWidth="1"
+                  strokeDasharray="4 4"
                 />
               )}
 
               {/* Starting block */}
               <line
-                x1={START_X} y1={y - 16}
-                x2={START_X} y2={y + 20}
-                stroke={color} strokeWidth="3" opacity="0.4"
+                x1={START_X}
+                y1={y - 16}
+                x2={START_X}
+                y2={y + 20}
+                stroke={color}
+                strokeWidth="3"
+                opacity="0.4"
               />
 
               {/* Lane label */}
               <text
-                x={LABEL_X} y={y + 4}
-                textAnchor="end" fill={color}
-                fontSize="11" fontWeight="500"
+                x={LABEL_X}
+                y={y + 4}
+                textAnchor="end"
+                fill={color}
+                fontSize="11"
+                fontWeight="500"
                 fontFamily="var(--font-dm-mono), monospace"
                 letterSpacing="0.05em"
                 style={{ textTransform: "uppercase" } as React.CSSProperties}
@@ -221,21 +334,31 @@ export function RaceTrack({
               {(isConfirmed || isError) && (
                 <g>
                   <rect
-                    x={FINISH_X + 24} y={y - 10}
-                    width="70" height="22" rx="2"
+                    x={FINISH_X + 24}
+                    y={y - 10}
+                    width="70"
+                    height="22"
+                    rx="2"
                     fill={isConfirmed ? "var(--success)" : "var(--destructive)"}
                     opacity="0.1"
-                    stroke={isConfirmed ? "var(--success)" : "var(--destructive)"}
-                    strokeWidth="1" strokeOpacity="0.3"
+                    stroke={
+                      isConfirmed ? "var(--success)" : "var(--destructive)"
+                    }
+                    strokeWidth="1"
+                    strokeOpacity="0.3"
                   />
                   <text
-                    x={FINISH_X + 59} y={y + 5}
+                    x={FINISH_X + 59}
+                    y={y + 5}
                     textAnchor="middle"
                     fill={isConfirmed ? "var(--success)" : "var(--destructive)"}
-                    fontSize="11" fontWeight="600"
+                    fontSize="11"
+                    fontWeight="600"
                     fontFamily="var(--font-dm-mono), monospace"
                   >
-                    {isConfirmed ? `${(cs.elapsedMs! / 1000).toFixed(2)}s` : "ERR"}
+                    {isConfirmed
+                      ? `${(cs.elapsedMs! / 1000).toFixed(2)}s`
+                      : "ERR"}
                   </text>
                 </g>
               )}
@@ -243,9 +366,12 @@ export function RaceTrack({
               {/* Confirmed flash */}
               {isConfirmed && (
                 <motion.circle
-                  cx={FINISH_X} cy={y}
-                  r="16" fill="none"
-                  stroke="var(--success)" strokeWidth="1.5"
+                  cx={FINISH_X}
+                  cy={y}
+                  r="16"
+                  fill="none"
+                  stroke="var(--success)"
+                  strokeWidth="1.5"
                   initial={{ opacity: 0.6, scale: 1 }}
                   animate={{ opacity: 0, scale: 2.5 }}
                   transition={{ duration: 1 }}

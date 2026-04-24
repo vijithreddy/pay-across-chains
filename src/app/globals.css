@@ -55,55 +55,55 @@
 
 :root {
   /* Base surfaces */
-  --bg-base: #080B0F;
-  --bg-surface: #0E1218;
-  --bg-raised: #161C26;
-  --border: #1E2733;
-  --border-bright: #2E3D50;
+  --bg-base: #080b0f;
+  --bg-surface: #0e1218;
+  --bg-raised: #161c26;
+  --border: #1e2733;
+  --border-bright: #2e3d50;
 
   /* Chain colors */
-  --eth-primary: #627EEA;
-  --eth-dim: #627EEA22;
-  --base-primary: #0052FF;
-  --base-dim: #0052FF22;
-  --tempo-primary: #7C3AED;
-  --tempo-dim: #7C3AED22;
-  --tempo-bright: #A78BFA;
+  --eth-primary: #627eea;
+  --eth-dim: #627eea22;
+  --base-primary: #0052ff;
+  --base-dim: #0052ff22;
+  --tempo-primary: #7c3aed;
+  --tempo-dim: #7c3aed22;
+  --tempo-bright: #a78bfa;
 
   /* Semantic */
-  --success: #10B981;
-  --warning: #F59E0B;
-  --text-primary: #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-dim: #64748B;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-dim: #64748b;
 
   /* Shadcn overrides */
-  --background: #080B0F;
-  --foreground: #F1F5F9;
-  --card: #0E1218;
-  --card-foreground: #F1F5F9;
-  --popover: #0E1218;
-  --popover-foreground: #F1F5F9;
-  --primary: #7C3AED;
-  --primary-foreground: #F1F5F9;
-  --secondary: #161C26;
-  --secondary-foreground: #F1F5F9;
-  --muted: #161C26;
-  --muted-foreground: #94A3B8;
-  --accent: #161C26;
-  --accent-foreground: #F1F5F9;
-  --destructive: #EF4444;
-  --border: #1E2733;
-  --input: #1E2733;
-  --ring: #7C3AED;
+  --background: #080b0f;
+  --foreground: #f1f5f9;
+  --card: #0e1218;
+  --card-foreground: #f1f5f9;
+  --popover: #0e1218;
+  --popover-foreground: #f1f5f9;
+  --primary: #7c3aed;
+  --primary-foreground: #f1f5f9;
+  --secondary: #161c26;
+  --secondary-foreground: #f1f5f9;
+  --muted: #161c26;
+  --muted-foreground: #94a3b8;
+  --accent: #161c26;
+  --accent-foreground: #f1f5f9;
+  --destructive: #ef4444;
+  --border: #1e2733;
+  --input: #1e2733;
+  --ring: #7c3aed;
   --radius: 0.25rem;
 }
 
 /* Diagonal grid background — subtle depth pattern */
 .diagonal-grid {
   background-image:
-    linear-gradient(45deg, #1E273308 1px, transparent 1px),
-    linear-gradient(-45deg, #1E273308 1px, transparent 1px);
+    linear-gradient(45deg, #1e273308 1px, transparent 1px),
+    linear-gradient(-45deg, #1e273308 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -112,29 +112,49 @@
   background: rgba(14, 18, 24, 0.7);
   backdrop-filter: blur(16px);
   border: 1px solid var(--border);
-  box-shadow: inset 0 1px 0 0 rgba(255,255,255,0.03);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
 /* Chain left-border accents */
-.chain-border-eth { border-left: 4px solid var(--eth-primary); }
-.chain-border-base { border-left: 4px solid var(--base-primary); }
-.chain-border-tempo { border-left: 4px solid var(--tempo-primary); }
+.chain-border-eth {
+  border-left: 4px solid var(--eth-primary);
+}
+.chain-border-base {
+  border-left: 4px solid var(--base-primary);
+}
+.chain-border-tempo {
+  border-left: 4px solid var(--tempo-primary);
+}
 
 /* Shimmer loading */
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 .shimmer {
-  background: linear-gradient(90deg, transparent 0%, var(--border-bright) 50%, transparent 100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--border-bright) 50%,
+    transparent 100%
+  );
   background-size: 200% 100%;
   animation: shimmer 2s ease-in-out infinite;
 }
 
 /* Pulse glow for confirmed states */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 0 0 transparent; }
-  50% { box-shadow: 0 0 12px 2px var(--tempo-dim); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 12px 2px var(--tempo-dim);
+  }
 }
 
 /* Timer monospace */

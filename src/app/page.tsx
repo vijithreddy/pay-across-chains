@@ -33,10 +33,15 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<Tab>("race");
   // useSyncExternalStore avoids the cascading setState-in-useEffect pattern.
   // Returns false on server, true on client — no double render.
-  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const dryRun = useSyncExternalStore(
     () => () => {},
-    () => typeof window !== "undefined" && window.location.search.includes("dry"),
+    () =>
+      typeof window !== "undefined" && window.location.search.includes("dry"),
     () => false
   );
 
@@ -129,7 +134,9 @@ export default function Home() {
 
                     {/* Title */}
                     <h1 className="font-mono text-3xl lg:text-4xl font-medium tracking-[0.15em] uppercase text-[var(--text-primary)] leading-tight">
-                      Pay Across<br />Chains
+                      Pay Across
+                      <br />
+                      Chains
                     </h1>
 
                     {/* Subtitle */}
@@ -153,7 +160,9 @@ export default function Home() {
                     {/* Connect button */}
                     <button
                       onClick={() => {
-                        const btn = document.querySelector("[data-testid='rk-connect-button']") as HTMLButtonElement;
+                        const btn = document.querySelector(
+                          "[data-testid='rk-connect-button']"
+                        ) as HTMLButtonElement;
                         btn?.click();
                       }}
                       className="w-full rounded-sm bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-xs uppercase tracking-[0.15em] py-3.5 transition-all"
@@ -161,7 +170,9 @@ export default function Home() {
                       Connect Wallet to Start &rarr;
                     </button>
                     {/* Hidden RainbowKit button */}
-                    <div className="hidden"><ConnectButton /></div>
+                    <div className="hidden">
+                      <ConnectButton />
+                    </div>
                   </div>
 
                   {/* Right: Idle race track preview */}

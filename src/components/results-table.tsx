@@ -1,6 +1,12 @@
 "use client";
 
-import { CHAIN_IDS, CHAIN_COLORS, CHAIN_NAMES, EXPLORER_URLS, tempo } from "@/lib/chains";
+import {
+  CHAIN_IDS,
+  CHAIN_COLORS,
+  CHAIN_NAMES,
+  EXPLORER_URLS,
+  tempo,
+} from "@/lib/chains";
 import type { ChainRaceState } from "@/lib/race-engine";
 import { ExternalLink, Copy, Check } from "lucide-react";
 import { useState } from "react";
@@ -19,13 +25,23 @@ function CopyHash({ hash }: { hash: string }) {
       className="inline-flex items-center gap-1 font-mono text-[10px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
     >
       {short}
-      {copied ? <Check className="size-2.5 text-[var(--success)]" /> : <Copy className="size-2.5" />}
+      {copied ? (
+        <Check className="size-2.5 text-[var(--success)]" />
+      ) : (
+        <Copy className="size-2.5" />
+      )}
     </button>
   );
 }
 
 /** Small colored badge pill for status indicators (FUNDED, WINNER, Native, etc.) */
-function Pill({ children, color }: { children: React.ReactNode; color: string }) {
+function Pill({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) {
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-sm text-[10px] font-mono uppercase border"
@@ -47,15 +63,21 @@ export function ResultsTable({
   chainStates: Record<number, ChainRaceState>;
 }) {
   const allConfirmed = CHAIN_IDS.every(
-    (id) => chainStates[id]?.state === "confirmed" || chainStates[id]?.state === "error"
+    (id) =>
+      chainStates[id]?.state === "confirmed" ||
+      chainStates[id]?.state === "error"
   );
   if (!allConfirmed) return null;
 
-  const confirmed = CHAIN_IDS.filter((id) => chainStates[id]?.state === "confirmed");
+  const confirmed = CHAIN_IDS.filter(
+    (id) => chainStates[id]?.state === "confirmed"
+  );
   const winnerId = confirmed.reduce(
     (best, id) =>
-      (chainStates[id]?.elapsedMs ?? Infinity) < (chainStates[best]?.elapsedMs ?? Infinity)
-        ? id : best,
+      (chainStates[id]?.elapsedMs ?? Infinity) <
+      (chainStates[best]?.elapsedMs ?? Infinity)
+        ? id
+        : best,
     confirmed[0]
   );
 
@@ -76,8 +98,14 @@ export function ResultsTable({
                 return (
                   <th key={id} className="px-4 py-2.5 text-center">
                     <div className="flex items-center justify-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-                      <span className="font-mono text-[10px] uppercase tracking-wider" style={{ color }}>
+                      <div
+                        className="w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                      <span
+                        className="font-mono text-[10px] uppercase tracking-wider"
+                        style={{ color }}
+                      >
                         {CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]}
                       </span>
                       {id === winnerId && (
@@ -91,58 +119,96 @@ export function ResultsTable({
           </thead>
           <tbody className="text-[var(--text-secondary)]">
             <tr className="border-b border-[var(--border)]">
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Time</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Time
+              </td>
               {CHAIN_IDS.map((id) => {
                 const cs = chainStates[id];
                 const isWinner = id === winnerId;
                 return (
                   <td key={id} className="px-4 py-2.5 text-center">
-                    <span className={`font-mono timer-display text-sm ${isWinner ? "text-[var(--success)] font-bold" : ""}`}>
-                      {cs?.state === "confirmed" ? `${(cs.elapsedMs! / 1000).toFixed(2)}s` : "Failed"}
+                    <span
+                      className={`font-mono timer-display text-sm ${isWinner ? "text-[var(--success)] font-bold" : ""}`}
+                    >
+                      {cs?.state === "confirmed"
+                        ? `${(cs.elapsedMs! / 1000).toFixed(2)}s`
+                        : "Failed"}
                     </span>
                   </td>
                 );
               })}
             </tr>
             <tr className="border-b border-[var(--border)]">
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Fee</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Fee
+              </td>
               {CHAIN_IDS.map((id) => (
-                <td key={id} className="px-4 py-2.5 text-center font-mono text-xs">
+                <td
+                  key={id}
+                  className="px-4 py-2.5 text-center font-mono text-xs"
+                >
                   {chainStates[id]?.feeDisplay ?? "\u2014"}
                 </td>
               ))}
             </tr>
             <tr className="border-b border-[var(--border)]">
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Fee Token</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Fee Token
+              </td>
               {CHAIN_IDS.map((id) => (
                 <td key={id} className="px-4 py-2.5 text-center">
                   {chainStates[id]?.feeToken ? (
-                    <Pill color={id === tempo.id ? "var(--success)" : "var(--text-secondary)"}>
+                    <Pill
+                      color={
+                        id === tempo.id
+                          ? "var(--success)"
+                          : "var(--text-secondary)"
+                      }
+                    >
                       {chainStates[id].feeToken}
                     </Pill>
-                  ) : "\u2014"}
+                  ) : (
+                    "\u2014"
+                  )}
                 </td>
               ))}
             </tr>
             <tr className="border-b border-[var(--border)]">
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Finality</td>
-              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">~12 min probabilistic</td>
-              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">7-day challenge</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Finality
+              </td>
+              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">
+                ~12 min probabilistic
+              </td>
+              <td className="px-4 py-2.5 text-center text-xs text-[var(--text-dim)]">
+                7-day challenge
+              </td>
               <td className="px-4 py-2.5 text-center">
                 <Pill color="var(--success)">Instant</Pill>
               </td>
             </tr>
             <tr className="border-b border-[var(--border)]">
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Memo</td>
-              <td className="px-4 py-2.5 text-center"><Pill color="var(--text-dim)">N/A</Pill></td>
-              <td className="px-4 py-2.5 text-center"><Pill color="var(--text-dim)">N/A</Pill></td>
-              <td className="px-4 py-2.5 text-center"><Pill color="var(--success)">Native</Pill></td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Memo
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Pill color="var(--text-dim)">N/A</Pill>
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Pill color="var(--text-dim)">N/A</Pill>
+              </td>
+              <td className="px-4 py-2.5 text-center">
+                <Pill color="var(--success)">Native</Pill>
+              </td>
             </tr>
             <tr>
-              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">Explorer</td>
+              <td className="px-4 py-2.5 font-mono text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+                Explorer
+              </td>
               {CHAIN_IDS.map((id) => {
                 const cs = chainStates[id];
-                const explorer = EXPLORER_URLS[id as keyof typeof EXPLORER_URLS];
+                const explorer =
+                  EXPLORER_URLS[id as keyof typeof EXPLORER_URLS];
                 return (
                   <td key={id} className="px-4 py-2.5 text-center">
                     {cs?.hash ? (
@@ -157,7 +223,9 @@ export function ResultsTable({
                           View <ExternalLink className="size-2.5" />
                         </a>
                       </div>
-                    ) : "\u2014"}
+                    ) : (
+                      "\u2014"
+                    )}
                   </td>
                 );
               })}
