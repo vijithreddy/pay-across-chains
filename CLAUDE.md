@@ -11,7 +11,8 @@ real explorer links. Built for a Tempo Solutions Engineer interview.
 1. Land on app → split hero: intro left, idle race track preview right
 2. User connects MetaMask via RainbowKit ConnectButton
 3. User signs in to Tempo Wallet via accounts SDK embedded dialog
-4. Funding checklist reads USDC balances on all 3 chains via token.balanceOf:
+4. Funding checklist reads USDC balances on all 3 chains via token.balanceOf.
+   Users can toggle Eth/Base off (click chain icon) to skip and save gas:
    - Ethereum: need ≥ 1 USDC (gas paid in ETH separately)
    - Base: need ≥ 1 USDC (gas paid in ETH separately)
    - Tempo: need ≥ 1.5 USDC (covers transfer + USDC gas fee)
@@ -20,14 +21,14 @@ real explorer links. Built for a Tempo Solutions Engineer interview.
    - Recipient: any valid address
    - Amount: 1 USDC
    - Memo: "Invoice #1042 — Demo Payment" (Tempo exclusive)
-7. "SEND ON ALL THREE" → sequential signing:
+7. "SEND ON ALL THREE" → sequential signing (enabled chains only):
    - Ethereum: MetaMask prompt (writeContract, ERC-20 transfer)
    - Base: MetaMask prompt (writeContract, ERC-20 transfer)
    - Tempo: Tempo Wallet dialog (Actions.token.transfer, native type 0x76)
-8. All 3 signed → race phase: Promise.allSettled waitForTransactionReceipt
-9. SVG 3-lane track animates, runners move on real tx state
-10. Tempo confirms (~500ms) → confetti, timer freezes, victory pose
-11. Base confirms (~3s), Ethereum confirms (~45s)
+8. All signed → waiting phase: spinner while confirmations come in
+9. All confirmed → replay phase: animated race with proportional timing
+10. Tempo finishes first (~500ms) → confetti → Base (~3s) → Ethereum (~45s)
+11. Times shown are REAL from broadcast, not replay animation time
 12. Results table: time, fee, fee token, finality, memo — with explorer links
 
 ## Dual-Wallet Architecture
@@ -97,16 +98,38 @@ export const tempo = tempoBase.extend({
 })
 ```
 
-## Race Engine — Two Phases
-Phase 1 — Sequential signing (one wallet prompt at a time):
-- Ethereum: wagmi writeContract → MetaMask prompt → hash + broadcastTime
-- Base: wagmi writeContract → MetaMask prompt → hash + broadcastTime
-- Tempo: Actions.token.transfer → Tempo Wallet dialog → hash + broadcastTime
+## Chain Toggle
+Users can disable Eth/Base to save gas during testing:
+- Click the chain icon circle in funding checklist to toggle
+- Disabled chains show "SKIPPED", grey out, skip signing
+- Tempo cannot be disabled — it's always included
+- Progress bar and allFunded only count enabled chains
+- `enabledChains: Set<number>` flows from page → checklist → race form → engine
+- Race engine filters `signOrder` to only include enabled chains
 
-Phase 2 — Simultaneous confirmation race:
-- Promise.allSettled → waitForTransactionReceipt for all 3
-- Each chain's elapsed time measured from its own broadcastTime
-- This gives honest per-chain latency
+## Race Engine — Three Phases (Replay Architecture)
+The race is NOT live — it's a replay of real data. This avoids timing
+issues from sequential signing (Eth/Base confirming during Tempo signing).
+
+Phase 1 — Sequential signing:
+- Ethereum: wagmi writeContract → MetaMask prompt → hash
+- Base: wagmi writeContract → MetaMask prompt → hash
+- Tempo: Actions.token.transfer → Tempo Wallet dialog → hash
+- Only enabled chains are signed (disabled chains skipped)
+
+Phase 2 — Silent confirmation wait:
+- UI shows spinner: "Waiting for confirmations..."
+- Promise.allSettled → waitForTransactionReceipt for all signed chains
+- Collects real elapsed times, fees, receipts
+- No animation yet — just data collection
+
+Phase 3 — Animated replay:
+- replayRace() schedules onUpdate calls at proportional times
+- All runners start at 0 simultaneously
+- Each chain finishes at (realTime / maxTime) * REPLAY_DURATION
+- REPLAY_DURATION capped at 10s so Ethereum's 45s doesn't bore users
+- Times shown are REAL (from broadcastTime), not replay time
+- Confetti fires when Tempo (winner) crosses finish
 
 ## Transaction Details
 - Ethereum: standard ERC-20 USDC transfer via wagmi writeContract
