@@ -5,6 +5,7 @@ import { mainnet, base } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   metaMaskWallet,
+  phantomWallet,
   coinbaseWallet,
   walletConnectWallet,
   injectedWallet,
@@ -17,6 +18,7 @@ const connectors = connectorsForWallets(
       groupName: "Wallets",
       wallets: [
         metaMaskWallet,
+        phantomWallet,
         coinbaseWallet,
         walletConnectWallet,
         injectedWallet,
