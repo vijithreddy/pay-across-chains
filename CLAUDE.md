@@ -131,10 +131,34 @@ Phase 3 — Animated replay:
 - Times shown are REAL (from broadcastTime), not replay time
 - Confetti fires when Tempo (winner) crosses finish
 
+## Sponsored Fees (Tempo Exclusive)
+Relay-based fee sponsorship — a server co-signs the tx and pays gas:
+
+Flow:
+1. User toggles "Sponsored" in payment form, enters relay password
+2. Race engine wraps Tempo client with withRelay(custom(client), relayTransport)
+3. Actions.token.transfer called with feePayer: true — omits feeToken from user sig
+4. Serialized tx has feePayerSignature: null — withRelay intercepts broadcast
+5. /api/relay receives half-signed tx, co-signs with FEE_PAYER_PRIVATE_KEY
+6. Relay broadcasts fully-signed tx, returns hash
+
+Architecture:
+- /api/relay/route.ts — co-signs via TxEnvelopeTempo + Secp256k1.sign, broadcasts
+- src/lib/relay-transport.ts — custom viem transport routing to /api/relay with Bearer auth
+- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio + password input
+- withRelay from viem/tempo with policy: "sign-and-broadcast"
+
+Security:
+- FEE_PAYER_PRIVATE_KEY: server-only env var, NEVER NEXT_PUBLIC_
+- RELAY_PASSWORD: server-only env var, sent as Bearer token
+- Relay returns 401 for unauthenticated requests
+- Fee payer is a secp256k1 account (not passkey), funded with USDC on Tempo
+
 ## Transaction Details
 - Ethereum: standard ERC-20 USDC transfer via wagmi writeContract
 - Base: standard ERC-20 USDC transfer via wagmi writeContract
 - Tempo: Actions.token.transfer from viem/tempo — native type 0x76, with memo
+- Tempo (sponsored): same but with feePayer: true, relay co-signs and pays gas
 - Fee calculation: gasUsed * effectiveGasPrice, formatEther for all chains
 
 ## Dry Race Mode
@@ -219,6 +243,9 @@ Dark financial terminal meets F1 race telemetry.
 - src/app/api/race/route.ts — POST to save race result
 - src/app/api/race/[id]/route.ts — GET to load race result
 - src/app/race/[id]/page.tsx — shareable race results page
+- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio for Tempo fees
+- src/app/api/relay/route.ts — POST to co-sign sponsored tx, GET for health check
+- src/lib/relay-transport.ts — custom viem transport routing to /api/relay
 - src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
 - src/types/index.ts — shared types (Tab, MigrationCard)
 - evals/regression.eval.ts — 43-check regression suite (run before any changes)
@@ -228,12 +255,13 @@ Run before any code change: `npx tsx evals/regression.eval.ts`
 43 checks covering: architecture, signing flow, dual-connection isolation,
 hydration guards, timing, funding, UI components, file existence, TypeScript build.
 
-Full suite (60+ checks): run all eval files:
+Full suite (100+ checks): run all eval files:
 - evals/regression.eval.ts (43 checks)
 - evals/signing-flow.eval.ts (10 checks)
 - evals/dual-connection.eval.ts (14 checks)
 - evals/hydration.eval.ts (4 checks)
 - evals/race-history.eval.ts (15 checks)
+- evals/sponsored-fees.eval.ts (30 checks)
 
 ## Environment Variables
 NEXT_PUBLIC_ETH_RPC
@@ -243,6 +271,8 @@ NEXT_PUBLIC_USDC_ETHEREUM
 NEXT_PUBLIC_USDC_BASE
 NEXT_PUBLIC_USDC_TEMPO
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+FEE_PAYER_PRIVATE_KEY (server-only — relay's Tempo private key)
+RELAY_PASSWORD (server-only — shared secret for relay auth)
 VERCEL_TOKEN
 
 ## Session Rules

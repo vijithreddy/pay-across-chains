@@ -1,7 +1,9 @@
 import {
   createPublicClient,
+  createWalletClient,
   parseUnits,
   formatEther,
+  custom,
   type Hash,
   type TransactionReceipt,
   type WalletClient,
@@ -10,11 +12,12 @@ import {
 } from "viem";
 import { writeContract, switchChain } from "@wagmi/core";
 import { mainnet, base } from "wagmi/chains";
-import { Actions } from "viem/tempo";
+import { Actions, withRelay } from "viem/tempo";
 import { Hex } from "ox";
 import { tempo, USDC_ADDRESSES, transports, CHAIN_NAMES } from "./chains";
 import { erc20Abi } from "./abi";
 import { config } from "./wagmi";
+import { relayTransport } from "./relay-transport";
 
 type SupportedChainId = typeof mainnet.id | typeof base.id | typeof tempo.id;
 import type { Chain } from "viem";
@@ -51,6 +54,8 @@ type RaceParams = {
   memo: string;
   tempoClient?: TempoWalletClient;
   enabledChains?: Set<number>;
+  sponsored?: boolean;
+  relayPassword?: string;
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
 
@@ -69,6 +74,24 @@ function getPublicClient(chainId: number) {
   });
 }
 
+/** Builds a relay-wrapped Tempo wallet client for sponsored transactions */
+function buildSponsoredClient(
+  tempoClient: TempoWalletClient,
+  password: string
+): TempoWalletClient {
+  // Wrap the wallet's transport with withRelay — routes sponsored txs to /api/relay
+  const sponsoredTransport = withRelay(
+    custom(tempoClient),
+    relayTransport(password),
+    { policy: "sign-and-broadcast" }
+  );
+  return createWalletClient({
+    account: tempoClient.account,
+    chain: tempo,
+    transport: sponsoredTransport,
+  }) as TempoWalletClient;
+}
+
 /** Phase 1: Sign and broadcast one chain — returns hash */
 async function signChain(
   chainId: SupportedChainId,
@@ -76,7 +99,9 @@ async function signChain(
   amount: bigint,
   memo: string,
   tempoClient: TempoWalletClient | undefined,
-  onUpdate: RaceParams["onUpdate"]
+  onUpdate: RaceParams["onUpdate"],
+  sponsored?: boolean,
+  relayPassword?: string
 ): Promise<Hash> {
   onUpdate(chainId, { state: "signing" });
 
@@ -95,14 +120,24 @@ async function signChain(
 
   if (chainId === tempo.id) {
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
+
+    // When sponsored, wrap client with relay transport so fee payer co-signs
+    const client =
+      sponsored && relayPassword
+        ? buildSponsoredClient(tempoClient, relayPassword)
+        : tempoClient;
+
     // viem/tempo Actions type expects a broader Client type
     hash = await (
       Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
-    )(tempoClient, {
+    )(client, {
       to: recipient,
       amount,
       memo: Hex.fromString(memo),
       token: USDC_ADDRESSES[tempo.id],
+      // feePayer: true tells viem to omit feeToken from the user's signing payload
+      // and serialize with feePayerSignature: null — the relay co-signs
+      ...(sponsored ? { feePayer: true } : {}),
     });
   } else {
     // wagmi v2 types don't infer extended chain IDs
@@ -133,13 +168,15 @@ type ConfirmationResult = {
   feeToken: string;
   error?: string;
   confirmed: boolean;
+  sponsored?: boolean;
 };
 
 /** Phase 2: Wait for one chain's confirmation silently — returns result data */
 async function waitForConfirmation(
   chainId: number,
   hash: Hash,
-  broadcastTime: number
+  broadcastTime: number,
+  sponsored?: boolean
 ): Promise<ConfirmationResult> {
   const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
 
@@ -150,10 +187,14 @@ async function waitForConfirmation(
     const endTime = performance.now();
     const feeWei = receipt.gasUsed * receipt.effectiveGasPrice;
 
+    const feeFormatted = parseFloat(formatEther(feeWei)).toFixed(6);
+    // Sponsored Tempo txs: fee still shows in receipt but relay paid it
     const feeDisplay =
       chainId === tempo.id
-        ? `${parseFloat(formatEther(feeWei)).toFixed(6)} USDC`
-        : `${parseFloat(formatEther(feeWei)).toFixed(6)} ETH`;
+        ? sponsored
+          ? `${feeFormatted} USDC (sponsored)`
+          : `${feeFormatted} USDC`
+        : `${feeFormatted} ETH`;
     const feeToken = chainId === tempo.id ? "USDC" : "ETH";
 
     return {
@@ -165,6 +206,7 @@ async function waitForConfirmation(
       feeDisplay,
       feeToken,
       confirmed: true,
+      sponsored,
     };
   } catch (err: unknown) {
     const endTime = performance.now();
@@ -258,7 +300,9 @@ export async function startRace(
         amountParsed,
         memo,
         params.tempoClient,
-        onUpdate
+        onUpdate,
+        params.sponsored,
+        params.relayPassword
       );
       const broadcastTime = performance.now();
       hashes[chainId] = { hash, broadcastTime };
@@ -289,7 +333,9 @@ export async function startRace(
   const confirmResults = await Promise.allSettled(
     signOrder.map((chainId) => {
       const { hash, broadcastTime } = hashes[chainId]!;
-      return waitForConfirmation(chainId, hash, broadcastTime);
+      // Only Tempo can be sponsored — Eth/Base always self-pay
+      const isSponsored = params.sponsored && chainId === tempo.id;
+      return waitForConfirmation(chainId, hash, broadcastTime, isSponsored);
     })
   );
 
@@ -341,7 +387,7 @@ const MOCK_SIGN_DELAY_MS = 500;
 
 /** Mock race — simulates signing then replays with mock timing */
 export async function startDryRace(
-  params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate" | "enabledChains">
+  params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate" | "enabledChains" | "sponsored">
 ): Promise<ChainRaceState[]> {
   const { recipient, amount, memo, onUpdate } = params;
   const allChains = [mainnet.id, base.id, tempo.id] as const;
@@ -370,16 +416,22 @@ export async function startDryRace(
   console.log("[dry-race] All signed. Collecting confirmations...");
   await new Promise((r) => setTimeout(r, 1000));
 
-  // Build mock results
-  const mockResults: ConfirmationResult[] = signOrder.map((chainId) => ({
-    chainId,
-    name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES],
-    hash: MOCK_HASHES[chainId],
-    elapsedMs: MOCK_TIMINGS[chainId],
-    feeDisplay: MOCK_FEES[chainId].display,
-    feeToken: MOCK_FEES[chainId].token,
-    confirmed: true,
-  }));
+  // Build mock results — sponsored Tempo shows "(sponsored)" suffix
+  const mockResults: ConfirmationResult[] = signOrder.map((chainId) => {
+    const isSponsored = params.sponsored && chainId === tempo.id;
+    return {
+      chainId,
+      name: CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES],
+      hash: MOCK_HASHES[chainId],
+      elapsedMs: MOCK_TIMINGS[chainId],
+      feeDisplay: isSponsored
+        ? `${MOCK_FEES[chainId].display} (sponsored)`
+        : MOCK_FEES[chainId].display,
+      feeToken: MOCK_FEES[chainId].token,
+      confirmed: true,
+      sponsored: isSponsored,
+    };
+  });
 
   // Replay animation
   console.log("[dry-race] Replaying race...");

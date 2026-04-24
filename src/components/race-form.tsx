@@ -16,6 +16,7 @@ import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
 import { Zap, ArrowLeft, Check, Share2 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { SponsorToggle } from "./sponsor-toggle";
 import type { RaceResult } from "@/types";
 
 const CONFETTI_CONFIG = {
@@ -59,6 +60,8 @@ export function RaceForm({
   const [recipient, setRecipient] = useState("");
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
+  const [sponsored, setSponsored] = useState(false);
+  const [relayPassword, setRelayPassword] = useState("");
   const [racing, setRacing] = useState(false);
   const [phase, setPhase] = useState<
     "idle" | "signing" | "waiting" | "racing" | "done"
@@ -114,6 +117,7 @@ export function RaceForm({
           amount,
           memo,
           enabledChains,
+          sponsored,
           onUpdate: handleUpdate,
         });
       } else {
@@ -124,6 +128,8 @@ export function RaceForm({
           account: address!,
           tempoClient,
           enabledChains,
+          sponsored,
+          relayPassword: sponsored ? relayPassword : undefined,
           onUpdate: handleUpdate,
         });
       }
@@ -220,6 +226,10 @@ export function RaceForm({
           racing={racing}
           onStart={handleStart}
           tempoAddress={tempoAddress}
+          sponsored={sponsored}
+          setSponsored={setSponsored}
+          relayPassword={relayPassword}
+          setRelayPassword={setRelayPassword}
         />
       )}
       {isSigning && <SigningStatus chainStates={chainStates} />}
@@ -281,7 +291,7 @@ export function RaceForm({
   );
 }
 
-/** Compact single-row payment form with recipient, amount, and memo fields */
+/** Compact single-row payment form with recipient, amount, memo, and sponsor toggle */
 function PaymentForm({
   recipient,
   setRecipient,
@@ -291,6 +301,10 @@ function PaymentForm({
   racing,
   onStart,
   tempoAddress,
+  sponsored,
+  setSponsored,
+  relayPassword,
+  setRelayPassword,
 }: {
   recipient: string;
   setRecipient: (v: string) => void;
@@ -300,6 +314,10 @@ function PaymentForm({
   racing: boolean;
   onStart: () => void;
   tempoAddress?: `0x${string}`;
+  sponsored: boolean;
+  setSponsored: (v: boolean) => void;
+  relayPassword: string;
+  setRelayPassword: (v: string) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -336,9 +354,18 @@ function PaymentForm({
           </div>
         </div>
       </div>
+
+      {/* Sponsor toggle — Tempo exclusive feature */}
+      <SponsorToggle
+        sponsored={sponsored}
+        setSponsored={setSponsored}
+        relayPassword={relayPassword}
+        setRelayPassword={setRelayPassword}
+      />
+
       <button
         onClick={onStart}
-        disabled={!allFunded || !recipient || racing}
+        disabled={!allFunded || !recipient || racing || (sponsored && !relayPassword)}
         className="w-full rounded-xl bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         <Zap className="size-4" /> Send on All Three
@@ -353,3 +380,4 @@ function PaymentForm({
     </div>
   );
 }
+
