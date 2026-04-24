@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useAccount } from "wagmi";
+import { isAddress } from "viem";
 import { mainnet, base } from "wagmi/chains";
 import { tempo, CHAIN_NAMES, CHAIN_COLORS } from "@/lib/chains";
 import { startRace, startDryRace, type ChainRaceState, type TxState } from "@/lib/race-engine";
@@ -142,6 +143,10 @@ export function RaceForm({
 
   const handleStart = async () => {
     if (!dryRun && (!address || !recipient)) return;
+    if (!dryRun && !isAddress(recipient)) {
+      alert("Invalid recipient address");
+      return;
+    }
     if (!dryRun && (!tempoClient || !tempoAddress)) {
       alert("Please sign in to Tempo Wallet first");
       return;
@@ -169,7 +174,7 @@ export function RaceForm({
         });
       }
     } catch (err) {
-      console.error("[race] Error:", err);
+      if (process.env.NODE_ENV === "development") console.error("[race] Error:", err);
     }
     setRacing(false);
     setPhase("done");

@@ -84,24 +84,13 @@ async function signChain(
   if (chainId === tempo.id) {
     // Use the Tempo SDK's native token.transfer via the Tempo Wallet client
     // (separate from wagmi — Tempo Wallet handles type 0x76 signing)
-    console.log("[race] Tempo: tempoClient =", tempoClient);
-    console.log("[race] Tempo: tempoClient.account =", (tempoClient as any)?.account);
-    console.log("[race] Tempo: tempoClient.chain =", (tempoClient as any)?.chain?.name);
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
-    console.log("[race] Tempo: calling Actions.token.transfer...");
-    console.log("[race] Tempo: params =", { to: recipient, amount: amount.toString(), token: USDC_ADDRESSES[tempo.id] });
-    try {
-      hash = await Actions.token.transfer(tempoClient as any, {
-        to: recipient,
-        amount,
-        memo: Hex.fromString(memo),
-        token: USDC_ADDRESSES[tempo.id],
-      } as any);
-      console.log("[race] Tempo: transfer hash =", hash);
-    } catch (transferErr) {
-      console.error("[race] Tempo: Actions.token.transfer FAILED:", transferErr);
-      throw transferErr;
-    }
+    hash = await Actions.token.transfer(tempoClient as any, {
+      to: recipient,
+      amount,
+      memo: Hex.fromString(memo),
+      token: USDC_ADDRESSES[tempo.id],
+    } as any);
   } else {
     hash = await writeContract(config, {
       chainId,
@@ -132,12 +121,6 @@ async function raceConfirmation(
     const receipt = await publicClient.waitForTransactionReceipt({ hash });
     const endTime = performance.now();
     const feeWei = receipt.gasUsed * receipt.effectiveGasPrice;
-    console.log(`[race] ${name} fee debug:`, {
-      gasUsed: receipt.gasUsed.toString(),
-      effectiveGasPrice: receipt.effectiveGasPrice.toString(),
-      feeWei: feeWei.toString(),
-      formatted: formatEther(feeWei),
-    });
 
     let feeDisplay: string;
     let feeToken: string;

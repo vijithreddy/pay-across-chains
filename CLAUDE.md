@@ -217,3 +217,35 @@ VERCEL_TOKEN
 - Never put tempoWallet connector in wagmi config — use accounts SDK directly
 - Never set multiInjectedProviderDiscovery to true — breaks dual wallet
 - Never stop mid-build to ask for confirmation — just build
+
+
+## Code Readability Rules
+- Every function max 30 lines — split if longer
+- Every file max 150 lines — split into smaller modules
+- One component per file, filename matches component name exactly
+- No inline styles — all styling via Tailwind classes or CSS variables
+- No magic numbers — extract to named constants at top of file
+- No commented-out code — delete it, git has history
+- All async functions wrapped in try/catch — no silent failures
+- Every component has a single responsibility — if you need "and" 
+  to describe it, split it
+- Imports ordered: React → third party → internal → types
+- Types and interfaces in /src/types/ never inline in components
+- Chain-specific logic lives in /src/lib/chains/ not in components
+- No any types — ever
+
+
+
+## Security Rules
+- NEVER log private keys, wallet addresses, or tx hashes to console 
+  in production — use process.env.NODE_ENV checks
+- NEVER put anything sensitive in NEXT_PUBLIC_ prefix — 
+  it is exposed to the browser
+- FEE_PAYER_PRIVATE_KEY must only ever be read in /src/app/api/ 
+  server routes — never in client components
+- All user address inputs must be validated with isAddress() 
+  from viem before any transaction
+- All amount inputs must be validated — positive number, 
+  max 6 decimal places, below wallet balance
+- RPC URLs are in env vars — never hardcoded in source
+- No secrets in CLAUDE.md, CHANGES.md or any committed file
