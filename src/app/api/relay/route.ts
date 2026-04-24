@@ -8,24 +8,21 @@ import { Secp256k1, Signature } from "ox";
 const RELAY_PASSWORD = process.env.RELAY_PASSWORD;
 const FEE_PAYER_PRIVATE_KEY = process.env.FEE_PAYER_PRIVATE_KEY;
 
-/**
- * Authenticates relay requests. Accepts:
- * - Bearer token (for direct API usage)
- * - Same-origin requests (for Provider-level feePayer transport)
- */
-function authenticate(req: NextRequest): boolean {
-  // Bearer token auth
-  const auth = req.headers.get("authorization") ?? "";
-  if (RELAY_PASSWORD && auth === `Bearer ${RELAY_PASSWORD}`) return true;
+/** CORS headers — Provider's http() transport triggers preflight on cross-origin */
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, GET, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization",
+};
 
-  // Same-origin: Provider's feePayer transport sends JSON-RPC without auth headers.
-  // Next.js API routes from same origin have matching host/origin or no origin header.
-  const origin = req.headers.get("origin");
-  const host = req.headers.get("host");
-  if (!origin) return true; // Same-origin fetch omits Origin header
-  if (host && origin.includes(host)) return true;
+/** JSON response with CORS headers */
+function json(data: unknown, status = 200) {
+  return NextResponse.json(data, { status, headers: corsHeaders });
+}
 
-  return false;
+/** Handle CORS preflight requests */
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: corsHeaders });
 }
 
 /** Co-signs a half-signed Tempo tx as fee payer, returns fully-signed serialized tx */
@@ -69,21 +66,14 @@ async function broadcast(signedTx: `0x${string}`): Promise<`0x${string}`> {
 
 /**
  * POST: JSON-RPC relay for sponsored Tempo transactions.
- * Handles three JSON-RPC methods used by the Provider's feePayer transport:
+ * Handles three methods used by the Provider's feePayer transport:
  * - eth_signRawTransaction: co-sign and return (sign-only policy)
- * - eth_sendRawTransaction: co-sign and broadcast (sign-and-broadcast policy)
+ * - eth_sendRawTransaction: co-sign and broadcast
  * - eth_fillTransaction: proxy to Tempo RPC for gas estimation
  */
 export async function POST(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   if (!FEE_PAYER_PRIVATE_KEY) {
-    return NextResponse.json(
-      { error: "Relay not configured" },
-      { status: 500 }
-    );
+    return json({ error: "Relay not configured" }, 500);
   }
 
   try {
@@ -93,7 +83,7 @@ export async function POST(req: NextRequest) {
     if (body.method === "eth_signRawTransaction") {
       const params = body.params as string[];
       const fullySigned = cosign(params[0] as `0x${string}`);
-      return NextResponse.json({ result: fullySigned });
+      return json({ result: fullySigned });
     }
 
     // eth_sendRawTransaction: co-sign + broadcast, return hash
@@ -101,17 +91,14 @@ export async function POST(req: NextRequest) {
       const params = body.params as string[];
       const fullySigned = cosign(params[0] as `0x${string}`);
       const hash = await broadcast(fullySigned);
-      return NextResponse.json({ result: hash });
+      return json({ result: hash });
     }
 
     // eth_fillTransaction: proxy to Tempo RPC for gas estimation
     if (body.method === "eth_fillTransaction") {
       const rpcUrl = process.env.NEXT_PUBLIC_TEMPO_RPC;
       if (!rpcUrl) {
-        return NextResponse.json(
-          { error: "Tempo RPC not configured" },
-          { status: 500 }
-        );
+        return json({ error: "Tempo RPC not configured" }, 500);
       }
       const rpcRes = await fetch(rpcUrl, {
         method: "POST",
@@ -124,35 +111,34 @@ export async function POST(req: NextRequest) {
         }),
       });
       const rpcData = (await rpcRes.json()) as Record<string, unknown>;
-      return NextResponse.json({ result: rpcData.result });
+      return json({ result: rpcData.result });
     }
 
-    return NextResponse.json({ error: "Unsupported method" }, { status: 400 });
+    return json({ error: "Unsupported method" }, 400);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Relay error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return json({ error: message }, 500);
   }
 }
 
 /** GET: check relay health and fee payer address */
 export async function GET(req: NextRequest) {
-  if (!authenticate(req)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // GET requires Bearer auth — not called by Provider transport
+  const auth = req.headers.get("authorization") ?? "";
+  if (!RELAY_PASSWORD || auth !== `Bearer ${RELAY_PASSWORD}`) {
+    return json({ error: "Unauthorized" }, 401);
   }
 
   if (!FEE_PAYER_PRIVATE_KEY) {
-    return NextResponse.json(
-      { error: "Relay not configured" },
-      { status: 500 }
-    );
+    return json({ error: "Relay not configured" }, 500);
   }
 
   try {
     const account = privateKeyToAccount(
       FEE_PAYER_PRIVATE_KEY as `0x${string}`
     );
-    return NextResponse.json({ status: "ok", feePayer: account.address });
+    return json({ status: "ok", feePayer: account.address });
   } catch {
-    return NextResponse.json({ error: "Invalid key config" }, { status: 500 });
+    return json({ error: "Invalid key config" }, 500);
   }
 }
