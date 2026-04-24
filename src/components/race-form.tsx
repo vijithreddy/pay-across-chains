@@ -61,7 +61,6 @@ export function RaceForm({
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
   const [sponsored, setSponsored] = useState(false);
-  const [relayPassword, setRelayPassword] = useState("");
   const [racing, setRacing] = useState(false);
   const [phase, setPhase] = useState<
     "idle" | "signing" | "waiting" | "racing" | "done"
@@ -129,7 +128,6 @@ export function RaceForm({
           tempoClient,
           enabledChains,
           sponsored,
-          relayPassword: sponsored ? relayPassword : undefined,
           onUpdate: handleUpdate,
         });
       }
@@ -232,8 +230,6 @@ export function RaceForm({
           tempoAddress={tempoAddress}
           sponsored={sponsored}
           setSponsored={setSponsored}
-          relayPassword={relayPassword}
-          setRelayPassword={setRelayPassword}
         />
       )}
       {isSigning && <SigningStatus chainStates={chainStates} />}
@@ -307,8 +303,6 @@ function PaymentForm({
   tempoAddress,
   sponsored,
   setSponsored,
-  relayPassword,
-  setRelayPassword,
 }: {
   recipient: string;
   setRecipient: (v: string) => void;
@@ -320,8 +314,6 @@ function PaymentForm({
   tempoAddress?: `0x${string}`;
   sponsored: boolean;
   setSponsored: (v: boolean) => void;
-  relayPassword: string;
-  setRelayPassword: (v: string) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -360,16 +352,11 @@ function PaymentForm({
       </div>
 
       {/* Sponsor toggle — Tempo exclusive feature */}
-      <SponsorToggle
-        sponsored={sponsored}
-        setSponsored={setSponsored}
-        relayPassword={relayPassword}
-        setRelayPassword={setRelayPassword}
-      />
+      <SponsorToggle sponsored={sponsored} setSponsored={setSponsored} />
 
       <button
         onClick={onStart}
-        disabled={!allFunded || !recipient || racing || (sponsored && !relayPassword)}
+        disabled={!allFunded || !recipient || racing}
         className="w-full rounded-xl bg-[var(--tempo-primary)] hover:bg-[var(--tempo-bright)] text-white font-mono text-sm uppercase tracking-wider h-11 transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
         <Zap className="size-4" /> Send on All Three

@@ -4,13 +4,9 @@
 export function SponsorToggle({
   sponsored,
   setSponsored,
-  relayPassword,
-  setRelayPassword,
 }: {
   sponsored: boolean;
   setSponsored: (v: boolean) => void;
-  relayPassword: string;
-  setRelayPassword: (v: string) => void;
 }) {
   return (
     <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] p-3 space-y-2">
@@ -45,18 +41,9 @@ export function SponsorToggle({
         </button>
       </div>
       {sponsored && (
-        <div className="space-y-1.5">
-          <p className="text-[10px] text-[var(--text-dim)]">
-            A relay server co-signs and pays the Tempo gas fee on your behalf.
-          </p>
-          <input
-            type="password"
-            value={relayPassword}
-            onChange={(e) => setRelayPassword(e.target.value)}
-            placeholder="Relay password"
-            className="w-full rounded-lg border border-[var(--border)] bg-[var(--bg-raised)] px-3 py-1.5 text-xs text-[var(--text-primary)] font-mono placeholder:text-[var(--text-dim)] focus:border-[var(--tempo-primary)] focus:outline-none transition-colors"
-          />
-        </div>
+        <p className="text-[10px] text-[var(--text-dim)]">
+          A relay server co-signs and pays the Tempo gas fee on your behalf.
+        </p>
       )}
     </div>
   );

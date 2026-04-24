@@ -135,21 +135,18 @@ Phase 3 — Animated replay:
 Relay-based fee sponsorship — a server co-signs the tx and pays gas:
 
 Flow:
-1. User toggles "Sponsored" in payment form, enters relay password
-2. Race engine builds transfer call via Actions.token.transfer.call
-3. prepareTransactionRequest with feePayer: true — fills gas, nonce, omits feeToken
-4. signTransaction via Tempo Wallet dialog — signs but does NOT broadcast
-5. Half-signed serialized tx POSTed to /api/relay with Bearer auth
-6. Relay co-signs with FEE_PAYER_PRIVATE_KEY, broadcasts, returns hash
-
-Why not withRelay: JSON-RPC accounts (dialog wallets) use eth_sendTransaction
-which signs+broadcasts atomically. withRelay only intercepts eth_sendRawTransaction
-(local accounts). Must use signTransaction + manual relay post instead.
+1. User toggles "Sponsored" in payment form
+2. Race engine passes feePayer: true to Actions.token.transfer
+3. Provider.create({ feePayer: '/api/relay' }) routes sponsored txs to relay
+4. Provider's internal transport handles eth_fillTransaction → relay (gas estimation)
+5. After dialog signs, routes eth_signRawTransaction → relay (co-signing)
+6. Relay co-signs with FEE_PAYER_PRIVATE_KEY, client broadcasts
 
 Architecture:
-- /api/relay/route.ts — co-signs via TxEnvelopeTempo + Secp256k1.sign, broadcasts
-- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio + password input
-- signAndRelay() in race-engine.ts — prepareTransactionRequest + signTransaction + fetch relay
+- Provider.create with feePayer: '/api/relay' — canonical Tempo pattern
+- /api/relay/route.ts — handles eth_signRawTransaction, eth_sendRawTransaction, eth_fillTransaction
+- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio (no password needed)
+- Same-origin auth — Provider transport uses http() without auth headers
 
 Security:
 - FEE_PAYER_PRIVATE_KEY: server-only env var, NEVER NEXT_PUBLIC_

@@ -8,18 +8,28 @@ import { Secp256k1, Signature } from "ox";
 const RELAY_PASSWORD = process.env.RELAY_PASSWORD;
 const FEE_PAYER_PRIVATE_KEY = process.env.FEE_PAYER_PRIVATE_KEY;
 
-/** Validates the relay password from the Authorization header */
+/**
+ * Authenticates relay requests. Accepts:
+ * - Bearer token (for direct API usage)
+ * - Same-origin requests (for Provider-level feePayer transport)
+ */
 function authenticate(req: NextRequest): boolean {
-  if (!RELAY_PASSWORD) return false;
+  // Bearer token auth
   const auth = req.headers.get("authorization") ?? "";
-  return auth === `Bearer ${RELAY_PASSWORD}`;
+  if (RELAY_PASSWORD && auth === `Bearer ${RELAY_PASSWORD}`) return true;
+
+  // Same-origin: Provider's feePayer transport sends JSON-RPC without auth headers.
+  // Next.js API routes from same origin have matching host/origin or no origin header.
+  const origin = req.headers.get("origin");
+  const host = req.headers.get("host");
+  if (!origin) return true; // Same-origin fetch omits Origin header
+  if (host && origin.includes(host)) return true;
+
+  return false;
 }
 
-/** Co-signs a half-signed Tempo tx as fee payer, broadcasts, returns hash */
-async function cosignAndBroadcast(
-  serializedTx: `0x${string}`
-): Promise<`0x${string}`> {
-  // Deserialize — sender is auto-recovered from their signature
+/** Co-signs a half-signed Tempo tx as fee payer, returns fully-signed serialized tx */
+function cosign(serializedTx: `0x${string}`): `0x${string}` {
   const envelope = TxEnvelopeTempo.from(
     serializedTx as TxEnvelopeTempo.Serialized
   );
@@ -40,26 +50,29 @@ async function cosignAndBroadcast(
   });
 
   // Re-serialize with both signatures
-  const fullySigned = TxEnvelopeTempo.serialize(envelope, {
+  return TxEnvelopeTempo.serialize(envelope, {
     feePayerSignature: Signature.from(feePayerSig),
-  });
+  }) as `0x${string}`;
+}
 
-  // Broadcast via Tempo RPC
+/** Broadcasts a fully-signed tx to Tempo RPC */
+async function broadcast(signedTx: `0x${string}`): Promise<`0x${string}`> {
   const client = createPublicClient({
     chain: tempo,
     transport: http(process.env.NEXT_PUBLIC_TEMPO_RPC),
   });
-
   return client.request({
     method: "eth_sendRawTransaction",
-    params: [fullySigned],
+    params: [signedTx],
   });
 }
 
 /**
- * POST: JSON-RPC relay endpoint for sponsored Tempo transactions.
- * Handles eth_sendRawTransaction — co-signs as fee payer then broadcasts.
- * Also accepts direct { serializedTx } format for simple API usage.
+ * POST: JSON-RPC relay for sponsored Tempo transactions.
+ * Handles three JSON-RPC methods used by the Provider's feePayer transport:
+ * - eth_signRawTransaction: co-sign and return (sign-only policy)
+ * - eth_sendRawTransaction: co-sign and broadcast (sign-and-broadcast policy)
+ * - eth_fillTransaction: proxy to Tempo RPC for gas estimation
  */
 export async function POST(req: NextRequest) {
   if (!authenticate(req)) {
@@ -76,14 +89,22 @@ export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Record<string, unknown>;
 
-    // JSON-RPC format — used by withRelay transport
+    // eth_signRawTransaction: co-sign only, return fully-signed tx (default policy)
+    if (body.method === "eth_signRawTransaction") {
+      const params = body.params as string[];
+      const fullySigned = cosign(params[0] as `0x${string}`);
+      return NextResponse.json({ result: fullySigned });
+    }
+
+    // eth_sendRawTransaction: co-sign + broadcast, return hash
     if (body.method === "eth_sendRawTransaction") {
       const params = body.params as string[];
-      const hash = await cosignAndBroadcast(params[0] as `0x${string}`);
+      const fullySigned = cosign(params[0] as `0x${string}`);
+      const hash = await broadcast(fullySigned);
       return NextResponse.json({ result: hash });
     }
 
-    // JSON-RPC: eth_fillTransaction — proxy directly to Tempo RPC
+    // eth_fillTransaction: proxy to Tempo RPC for gas estimation
     if (body.method === "eth_fillTransaction") {
       const rpcUrl = process.env.NEXT_PUBLIC_TEMPO_RPC;
       if (!rpcUrl) {
@@ -106,15 +127,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ result: rpcData.result });
     }
 
-    // Direct format — { serializedTx: "0x..." }
-    if (body.serializedTx) {
-      const hash = await cosignAndBroadcast(
-        body.serializedTx as `0x${string}`
-      );
-      return NextResponse.json({ hash });
-    }
-
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    return NextResponse.json({ error: "Unsupported method" }, { status: 400 });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Relay error";
     return NextResponse.json({ error: message }, { status: 500 });

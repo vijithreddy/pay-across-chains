@@ -1,12 +1,12 @@
 /**
  * Sponsored Fees eval
  *
- * Validates the relay-based fee sponsorship flow:
- * 1. Relay API route handles co-signing + broadcasting
- * 2. Relay transport routes JSON-RPC to /api/relay with auth
- * 3. Race engine supports feePayer: true for sponsored Tempo txs
- * 4. UI has sponsor toggle + password input
- * 5. Security: private key only in server routes, password via Bearer token
+ * Validates the Provider-level fee sponsorship flow:
+ * 1. Provider.create configured with feePayer relay URL
+ * 2. Race engine passes feePayer: true for sponsored Tempo txs
+ * 3. Relay API handles co-signing + broadcasting
+ * 4. UI has sponsor toggle
+ * 5. Security: private key only in server routes
  */
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -17,57 +17,64 @@ type Check = { name: string; pass: boolean; detail?: string };
 const checks: Check[] = [];
 
 // --- File existence ---
-const relayRoutePath = join(SRC, "app/api/relay/route.ts");
-const sponsorTogglePath = join(SRC, "components/sponsor-toggle.tsx");
-
 checks.push({
   name: "file: api/relay/route.ts exists",
-  pass: existsSync(relayRoutePath),
+  pass: existsSync(join(SRC, "app/api/relay/route.ts")),
 });
 
 checks.push({
   name: "file: components/sponsor-toggle.tsx exists",
-  pass: existsSync(sponsorTogglePath),
+  pass: existsSync(join(SRC, "components/sponsor-toggle.tsx")),
+});
+
+// --- Tempo Provider ---
+const tempoProvider = readFileSync(
+  join(SRC, "components/tempo-provider.tsx"),
+  "utf-8"
+);
+
+checks.push({
+  name: "tempo-provider: configures feePayer on Provider.create",
+  pass:
+    tempoProvider.includes("feePayer") &&
+    tempoProvider.includes("/api/relay"),
+  detail:
+    "Provider.create({ feePayer: '/api/relay' }) routes sponsored txs to relay",
 });
 
 // --- Relay route ---
-const relayRoute = readFileSync(relayRoutePath, "utf-8");
+const relayRoute = readFileSync(
+  join(SRC, "app/api/relay/route.ts"),
+  "utf-8"
+);
 
 checks.push({
-  name: "relay: uses TxEnvelopeTempo.from to deserialize",
-  pass: relayRoute.includes("TxEnvelopeTempo.from"),
-  detail: "Must deserialize the half-signed tx to extract sender",
-});
-
-checks.push({
-  name: "relay: computes getFeePayerSignPayload",
-  pass: relayRoute.includes("getFeePayerSignPayload"),
-  detail: "Must compute the fee payer signing payload bound to sender",
+  name: "relay: uses TxEnvelopeTempo for co-signing",
+  pass:
+    relayRoute.includes("TxEnvelopeTempo.from") &&
+    relayRoute.includes("getFeePayerSignPayload") &&
+    relayRoute.includes("TxEnvelopeTempo.serialize"),
 });
 
 checks.push({
   name: "relay: signs with Secp256k1.sign",
   pass: relayRoute.includes("Secp256k1.sign"),
-  detail: "Must co-sign with the relay's private key",
 });
 
 checks.push({
-  name: "relay: re-serializes with feePayerSignature",
-  pass: relayRoute.includes("TxEnvelopeTempo.serialize"),
-  detail: "Must re-serialize with both sender + fee payer signatures",
+  name: "relay: handles eth_signRawTransaction (sign-only policy)",
+  pass: relayRoute.includes("eth_signRawTransaction"),
+  detail: "Provider's default policy: relay signs, client broadcasts",
 });
 
 checks.push({
-  name: "relay: broadcasts via eth_sendRawTransaction",
+  name: "relay: handles eth_sendRawTransaction (sign-and-broadcast)",
   pass: relayRoute.includes("eth_sendRawTransaction"),
-  detail: "Must broadcast the fully-signed tx to Tempo RPC",
 });
 
 checks.push({
-  name: "relay: password auth via Bearer token",
-  pass:
-    relayRoute.includes("Bearer") && relayRoute.includes("authorization"),
-  detail: "Must validate password from Authorization header",
+  name: "relay: handles eth_fillTransaction (gas estimation proxy)",
+  pass: relayRoute.includes("eth_fillTransaction"),
 });
 
 checks.push({
@@ -75,85 +82,49 @@ checks.push({
   pass:
     relayRoute.includes("FEE_PAYER_PRIVATE_KEY") &&
     !relayRoute.includes("NEXT_PUBLIC_FEE_PAYER"),
-  detail: "Private key must NEVER be in a NEXT_PUBLIC_ env var",
 });
 
 checks.push({
-  name: "relay: reads RELAY_PASSWORD from env",
-  pass: relayRoute.includes("RELAY_PASSWORD"),
+  name: "relay: supports same-origin auth (for Provider transport)",
+  pass: relayRoute.includes("origin") || relayRoute.includes("Origin"),
+  detail: "Provider feePayer transport uses http() without auth headers",
 });
 
 checks.push({
-  name: "relay: returns 401 for bad auth",
+  name: "relay: returns 401 for unauthorized requests",
   pass: relayRoute.includes("401"),
-  detail: "Must reject unauthenticated requests",
-});
-
-checks.push({
-  name: "relay: handles eth_fillTransaction proxy",
-  pass: relayRoute.includes("eth_fillTransaction"),
-  detail: "withRelay sends eth_fillTransaction to relay for gas estimation",
 });
 
 // --- Race engine ---
 const raceEngine = readFileSync(join(SRC, "lib/race-engine.ts"), "utf-8");
 
 checks.push({
-  name: "race-engine: accepts sponsored + relayPassword params",
-  pass:
-    raceEngine.includes("sponsored") &&
-    raceEngine.includes("relayPassword"),
+  name: "race-engine: accepts sponsored param",
+  pass: raceEngine.includes("sponsored"),
 });
 
 checks.push({
   name: "race-engine: passes feePayer: true when sponsored",
   pass: raceEngine.includes("feePayer: true"),
-  detail:
-    "feePayer: true omits feeToken from user signing, serializes with null feePayerSignature",
+  detail: "feePayer: true triggers Provider's relay routing",
 });
 
 checks.push({
-  name: "race-engine: uses signAndRelay for sponsored flow",
-  pass: raceEngine.includes("signAndRelay"),
-  detail:
-    "Dialog signs via eth_signTransaction, then relay co-signs and broadcasts",
-});
-
-checks.push({
-  name: "race-engine: uses signTransaction (not sendTransaction) for sponsored",
-  pass: raceEngine.includes("signTransaction"),
-  detail:
-    "JSON-RPC accounts use eth_sendTransaction which broadcasts atomically — must use signTransaction instead",
-});
-
-checks.push({
-  name: "race-engine: uses prepareTransactionRequest for sponsored",
-  pass: raceEngine.includes("prepareTransactionRequest"),
-  detail: "Must prepare tx (gas, nonce) before signing",
-});
-
-checks.push({
-  name: "race-engine: posts half-signed tx to /api/relay",
-  pass:
-    raceEngine.includes("/api/relay") &&
-    raceEngine.includes("serializedTx"),
-  detail: "Half-signed tx sent to relay for co-signing + broadcast",
-});
-
-checks.push({
-  name: "race-engine: sends Bearer auth to relay",
-  pass: raceEngine.includes("Bearer"),
-  detail: "Relay password sent as Authorization header",
+  name: "race-engine: does NOT fetch /api/relay directly",
+  pass: !raceEngine.includes('fetch("/api/relay"'),
+  detail: "Provider handles relay routing — no manual fetch needed",
 });
 
 checks.push({
   name: "race-engine: shows (sponsored) in fee display",
   pass: raceEngine.includes("(sponsored)"),
-  detail: "Fee display should indicate when relay paid the fee",
 });
 
 // --- Sponsor toggle component ---
-const sponsorToggle = readFileSync(sponsorTogglePath, "utf-8");
+const sponsorToggle = readFileSync(
+  join(SRC, "components/sponsor-toggle.tsx"),
+  "utf-8"
+);
 
 checks.push({
   name: "sponsor-toggle: has Self-pay option",
@@ -166,11 +137,9 @@ checks.push({
 });
 
 checks.push({
-  name: "sponsor-toggle: has password input",
-  pass:
-    sponsorToggle.includes('type="password"') &&
-    sponsorToggle.includes("relayPassword"),
-  detail: "Password input for relay authentication",
+  name: "sponsor-toggle: no password input (Provider handles auth)",
+  pass: !sponsorToggle.includes('type="password"'),
+  detail: "Provider-level feePayer uses same-origin auth, no password needed",
 });
 
 // --- Race form integration ---
@@ -190,14 +159,9 @@ checks.push({
 });
 
 checks.push({
-  name: "race-form: passes relayPassword to startRace",
-  pass: raceForm.includes("relayPassword"),
-});
-
-checks.push({
-  name: "race-form: disables start button when sponsored but no password",
-  pass: raceForm.includes("sponsored && !relayPassword"),
-  detail: "Must not start a sponsored race without relay password",
+  name: "race-form: no relayPassword (Provider handles relay routing)",
+  pass: !raceForm.includes("relayPassword"),
+  detail: "Provider-level feePayer removes need for manual relay password",
 });
 
 // --- env.example ---
@@ -211,23 +175,18 @@ checks.push({
   pass: envExample.includes("FEE_PAYER_PRIVATE_KEY"),
 });
 
-checks.push({
-  name: "env.example: documents RELAY_PASSWORD",
-  pass: envExample.includes("RELAY_PASSWORD"),
-});
-
 // Report
 const failed = checks.filter((c) => !c.pass);
 if (failed.length > 0) {
   console.error("SPONSORED-FEES EVAL FAILED:");
   for (const f of failed) {
-    console.error(`  ✗ ${f.name}`);
-    if (f.detail) console.error(`    → ${f.detail}`);
+    console.error(`  \u2717 ${f.name}`);
+    if (f.detail) console.error(`    \u2192 ${f.detail}`);
   }
   process.exit(1);
 } else {
   console.log(`SPONSORED-FEES EVAL PASSED (${checks.length} checks):`);
   for (const c of checks) {
-    console.log(`  ✓ ${c.name}`);
+    console.log(`  \u2713 ${c.name}`);
   }
 }

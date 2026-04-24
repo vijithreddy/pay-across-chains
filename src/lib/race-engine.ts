@@ -2,7 +2,6 @@ import {
   createPublicClient,
   parseUnits,
   formatEther,
-
   type Hash,
   type TransactionReceipt,
   type WalletClient,
@@ -53,7 +52,6 @@ type RaceParams = {
   tempoClient?: TempoWalletClient;
   enabledChains?: Set<number>;
   sponsored?: boolean;
-  relayPassword?: string;
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
 
@@ -72,54 +70,6 @@ function getPublicClient(chainId: number) {
   });
 }
 
-/**
- * Sponsored Tempo tx: dialog signs (not broadcasts), then relay co-signs + broadcasts.
- * JSON-RPC accounts use eth_sendTransaction which signs+broadcasts atomically,
- * so we use eth_signTransaction instead to get the half-signed serialized tx.
- */
-async function signAndRelay(
-  tempoClient: TempoWalletClient,
-  recipient: `0x${string}`,
-  amount: bigint,
-  memo: string,
-  relayPassword: string
-): Promise<Hash> {
-  // Build the transfer call data using Actions.token.transfer.call
-  const call = Actions.token.transfer.call({
-    to: recipient,
-    amount,
-    memo: Hex.fromString(memo),
-    token: USDC_ADDRESSES[tempo.id],
-  });
-
-  // Prepare tx request with feePayer: true — omits feeToken from signing payload
-  const prepared = await tempoClient.prepareTransactionRequest({
-    ...call,
-    feePayer: true,
-  } as never);
-
-  // Dialog signs but does NOT broadcast — returns serialized half-signed tx
-  const signedTx = await tempoClient.signTransaction(prepared as never);
-
-  // Post half-signed tx to relay for co-signing + broadcast
-  const res = await fetch("/api/relay", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${relayPassword}`,
-    },
-    body: JSON.stringify({ serializedTx: signedTx }),
-  });
-
-  if (!res.ok) {
-    const body = (await res.json().catch(() => ({}))) as Record<string, string>;
-    throw new Error(body.error ?? `Relay error: ${res.status}`);
-  }
-
-  const data = (await res.json()) as { hash: `0x${string}` };
-  return data.hash;
-}
-
 /** Phase 1: Sign and broadcast one chain — returns hash */
 async function signChain(
   chainId: SupportedChainId,
@@ -128,8 +78,7 @@ async function signChain(
   memo: string,
   tempoClient: TempoWalletClient | undefined,
   onUpdate: RaceParams["onUpdate"],
-  sponsored?: boolean,
-  relayPassword?: string
+  sponsored?: boolean
 ): Promise<Hash> {
   onUpdate(chainId, { state: "signing" });
 
@@ -148,27 +97,19 @@ async function signChain(
 
   if (chainId === tempo.id) {
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
-
-    if (sponsored && relayPassword) {
-      // Sponsored: sign via dialog, then relay co-signs and broadcasts
-      hash = await signAndRelay(
-        tempoClient,
-        recipient,
-        amount,
-        memo,
-        relayPassword
-      );
-    } else {
-      // Self-pay: dialog signs and broadcasts atomically
-      hash = await (
-        Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
-      )(tempoClient, {
-        to: recipient,
-        amount,
-        memo: Hex.fromString(memo),
-        token: USDC_ADDRESSES[tempo.id],
-      });
-    }
+    // viem/tempo Actions type expects a broader Client type.
+    // When sponsored, feePayer: true tells the Provider to route through
+    // the relay configured in Provider.create({ feePayer: '/api/relay' }).
+    // The relay co-signs and the Provider broadcasts the fully-signed tx.
+    hash = await (
+      Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
+    )(tempoClient, {
+      to: recipient,
+      amount,
+      memo: Hex.fromString(memo),
+      token: USDC_ADDRESSES[tempo.id],
+      ...(sponsored ? { feePayer: true } : {}),
+    });
   } else {
     // wagmi v2 types don't infer extended chain IDs
     hash = await (writeContract as (...args: unknown[]) => Promise<Hash>)(
@@ -331,8 +272,7 @@ export async function startRace(
         memo,
         params.tempoClient,
         onUpdate,
-        params.sponsored,
-        params.relayPassword
+        params.sponsored
       );
       const broadcastTime = performance.now();
       hashes[chainId] = { hash, broadcastTime };

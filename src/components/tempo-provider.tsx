@@ -57,6 +57,8 @@ export function TempoProvider({ children }: { children: ReactNode }) {
         dialog: isLocalhost ? Dialog.popup() : Dialog.iframe(),
       }),
       chains: [tempo],
+      // Relay URL for sponsored fees — Provider routes feePayer: true txs here
+      feePayer: "/api/relay",
     });
 
     const provider = providerRef.current;
