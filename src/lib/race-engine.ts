@@ -50,6 +50,7 @@ type RaceParams = {
   amount: string;
   memo: string;
   tempoClient?: TempoWalletClient;
+  enabledChains?: Set<number>;
   onUpdate: (chainId: number, state: Partial<ChainRaceState>) => void;
 };
 
@@ -240,8 +241,11 @@ export async function startRace(
   const { recipient, amount, memo, onUpdate } = params;
   const amountParsed = parseUnits(amount, 6);
 
-  // Sign slowest chain first so it gets the most mempool time
-  const signOrder = [mainnet.id, base.id, tempo.id] as const;
+  // Only race enabled chains — disabled ones are skipped entirely
+  const allChains = [mainnet.id, base.id, tempo.id] as const;
+  const signOrder = allChains.filter(
+    (id) => !params.enabledChains || params.enabledChains.has(id)
+  );
   const hashes: Partial<Record<number, { hash: Hash; broadcastTime: number }>> =
     {};
 
@@ -337,10 +341,13 @@ const MOCK_SIGN_DELAY_MS = 500;
 
 /** Mock race — simulates signing then replays with mock timing */
 export async function startDryRace(
-  params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate">
+  params: Pick<RaceParams, "recipient" | "amount" | "memo" | "onUpdate" | "enabledChains">
 ): Promise<ChainRaceState[]> {
   const { recipient, amount, memo, onUpdate } = params;
-  const signOrder = [mainnet.id, base.id, tempo.id] as const;
+  const allChains = [mainnet.id, base.id, tempo.id] as const;
+  const signOrder = allChains.filter(
+    (id) => !params.enabledChains || params.enabledChains.has(id)
+  );
 
   console.log("[dry-race] ============ DRY RACE START ============");
   console.log("[dry-race] Recipient:", recipient);

@@ -46,11 +46,13 @@ export function RaceForm({
   tempoAddress,
   onBack,
   dryRun,
+  enabledChains,
 }: {
   allFunded: boolean;
   tempoAddress?: `0x${string}`;
   onBack?: () => void;
   dryRun?: boolean;
+  enabledChains?: Set<number>;
 }) {
   const { address } = useAccount();
   const { client: tempoClient } = useTempoWallet();
@@ -111,6 +113,7 @@ export function RaceForm({
           recipient: (recipient || DRY_RUN_RECIPIENT) as `0x${string}`,
           amount,
           memo,
+          enabledChains,
           onUpdate: handleUpdate,
         });
       } else {
@@ -120,6 +123,7 @@ export function RaceForm({
           memo,
           account: address!,
           tempoClient,
+          enabledChains,
           onUpdate: handleUpdate,
         });
       }

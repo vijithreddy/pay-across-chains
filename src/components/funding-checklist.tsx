@@ -50,9 +50,13 @@ function useUsdcBalance(chainId: number, address: `0x${string}` | undefined) {
 export function FundingChecklist({
   onAllFunded,
   tempoAddress,
+  enabledChains,
+  onToggleChain,
 }: {
   onAllFunded: (funded: boolean) => void;
   tempoAddress?: `0x${string}`;
+  enabledChains: Set<number>;
+  onToggleChain: (chainId: number) => void;
 }) {
   const { address } = useAccount();
   const mounted = useSyncExternalStore(
@@ -93,15 +97,20 @@ export function FundingChecklist({
     };
   });
 
-  const allFunded = statuses.every((s) => s.funded);
+  // Only enabled chains need to be funded — disabled chains are skipped
+  const allFunded = statuses
+    .filter((s) => enabledChains.has(s.chainId))
+    .every((s) => s.funded);
   if (typeof onAllFunded === "function") {
     queueMicrotask(() => onAllFunded(allFunded));
   }
 
   if (!mounted) return null;
 
-  const fundedCount = statuses.filter((s) => s.funded).length;
-  const failedChains = statuses.filter((s) => s.error).map((s) => s.name);
+  const enabledStatuses = statuses.filter((s) => enabledChains.has(s.chainId));
+  const fundedCount = enabledStatuses.filter((s) => s.funded).length;
+  const totalEnabled = enabledStatuses.length;
+  const failedChains = statuses.filter((s) => s.error && enabledChains.has(s.chainId)).map((s) => s.name);
 
   return (
     <div className="gradient-border p-6 space-y-5">
@@ -133,9 +142,9 @@ export function FundingChecklist({
         </p>
       </div>
 
-      {/* Progress dots */}
+      {/* Progress bar — tracks only enabled chains */}
       <div className="flex gap-2">
-        {[0, 1, 2].map((i) => (
+        {Array.from({ length: totalEnabled }, (_, i) => (
           <div
             key={i}
             className={`h-1.5 flex-1 rounded-full transition-all ${
@@ -149,26 +158,43 @@ export function FundingChecklist({
 
       {/* Chain rows */}
       <div className="space-y-1">
-        {statuses.map((s, i) => (
+        {statuses.map((s, i) => {
+          const isEnabled = enabledChains.has(s.chainId);
+          const isTempo = s.chainId === tempo.id;
+          return (
           <div key={s.chainId}>
-            <div className="flex items-center justify-between py-3.5 px-1 rounded-xl hover:bg-[var(--bg-raised)] transition-all group">
+            <div className={`flex items-center justify-between py-3.5 px-1 rounded-xl transition-all group ${
+              isEnabled ? "hover:bg-[var(--bg-raised)]" : "opacity-40"
+            }`}>
               <div className="flex items-center gap-3">
-                {/* Chain icon circle with gradient */}
-                <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                {/* Toggle — Tempo always on */}
+                <button
+                  onClick={() => onToggleChain(s.chainId)}
+                  disabled={isTempo}
+                  title={isTempo ? "Tempo is always included" : isEnabled ? "Disable chain" : "Enable chain"}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold transition-all ${
+                    isTempo ? "cursor-default" : "cursor-pointer hover:scale-110"
+                  }`}
                   style={{
-                    background: `linear-gradient(135deg, ${s.color}, ${s.color}aa)`,
+                    background: isEnabled
+                      ? `linear-gradient(135deg, ${s.color}, ${s.color}aa)`
+                      : "var(--bg-elevated)",
                   }}
                 >
                   {s.name[0]}
-                </div>
+                </button>
                 <div>
-                  <div className="text-sm font-medium text-white">{s.name}</div>
+                  <div className={`text-sm font-medium ${isEnabled ? "text-white" : "text-[var(--text-dim)]"}`}>
+                    {s.name}
+                    {!isEnabled && <span className="ml-2 text-[10px] text-[var(--text-dim)]">SKIPPED</span>}
+                  </div>
                   <div className="text-xs text-[var(--text-dim)]">
-                    Need {s.required}
+                    {isEnabled ? `Need ${s.required}` : "Click to enable"}
                   </div>
                 </div>
               </div>
+              {/* Only show balance/status for enabled chains */}
+              {isEnabled && (
               <div className="flex items-center gap-3">
                 {s.loading ? (
                   <div className="h-4 w-20 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
@@ -204,12 +230,14 @@ export function FundingChecklist({
                   </>
                 )}
               </div>
+              )}
             </div>
             {i < statuses.length - 1 && (
               <div className="h-px bg-[var(--border)] mx-1" />
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
