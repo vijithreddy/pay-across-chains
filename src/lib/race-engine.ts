@@ -1,9 +1,8 @@
 import {
   createPublicClient,
-  createWalletClient,
   parseUnits,
   formatEther,
-  custom,
+
   type Hash,
   type TransactionReceipt,
   type WalletClient,
@@ -12,12 +11,11 @@ import {
 } from "viem";
 import { writeContract, switchChain } from "@wagmi/core";
 import { mainnet, base } from "wagmi/chains";
-import { Actions, withRelay } from "viem/tempo";
+import { Actions } from "viem/tempo";
 import { Hex } from "ox";
 import { tempo, USDC_ADDRESSES, transports, CHAIN_NAMES } from "./chains";
 import { erc20Abi } from "./abi";
 import { config } from "./wagmi";
-import { relayTransport } from "./relay-transport";
 
 type SupportedChainId = typeof mainnet.id | typeof base.id | typeof tempo.id;
 import type { Chain } from "viem";
@@ -74,22 +72,52 @@ function getPublicClient(chainId: number) {
   });
 }
 
-/** Builds a relay-wrapped Tempo wallet client for sponsored transactions */
-function buildSponsoredClient(
+/**
+ * Sponsored Tempo tx: dialog signs (not broadcasts), then relay co-signs + broadcasts.
+ * JSON-RPC accounts use eth_sendTransaction which signs+broadcasts atomically,
+ * so we use eth_signTransaction instead to get the half-signed serialized tx.
+ */
+async function signAndRelay(
   tempoClient: TempoWalletClient,
-  password: string
-): TempoWalletClient {
-  // Wrap the wallet's transport with withRelay — routes sponsored txs to /api/relay
-  const sponsoredTransport = withRelay(
-    custom(tempoClient),
-    relayTransport(password),
-    { policy: "sign-and-broadcast" }
-  );
-  return createWalletClient({
-    account: tempoClient.account,
-    chain: tempo,
-    transport: sponsoredTransport,
-  }) as TempoWalletClient;
+  recipient: `0x${string}`,
+  amount: bigint,
+  memo: string,
+  relayPassword: string
+): Promise<Hash> {
+  // Build the transfer call data using Actions.token.transfer.call
+  const call = Actions.token.transfer.call({
+    to: recipient,
+    amount,
+    memo: Hex.fromString(memo),
+    token: USDC_ADDRESSES[tempo.id],
+  });
+
+  // Prepare tx request with feePayer: true — omits feeToken from signing payload
+  const prepared = await tempoClient.prepareTransactionRequest({
+    ...call,
+    feePayer: true,
+  } as never);
+
+  // Dialog signs but does NOT broadcast — returns serialized half-signed tx
+  const signedTx = await tempoClient.signTransaction(prepared as never);
+
+  // Post half-signed tx to relay for co-signing + broadcast
+  const res = await fetch("/api/relay", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${relayPassword}`,
+    },
+    body: JSON.stringify({ serializedTx: signedTx }),
+  });
+
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as Record<string, string>;
+    throw new Error(body.error ?? `Relay error: ${res.status}`);
+  }
+
+  const data = (await res.json()) as { hash: `0x${string}` };
+  return data.hash;
 }
 
 /** Phase 1: Sign and broadcast one chain — returns hash */
@@ -121,24 +149,26 @@ async function signChain(
   if (chainId === tempo.id) {
     if (!tempoClient) throw new Error("Tempo Wallet not connected");
 
-    // When sponsored, wrap client with relay transport so fee payer co-signs
-    const client =
-      sponsored && relayPassword
-        ? buildSponsoredClient(tempoClient, relayPassword)
-        : tempoClient;
-
-    // viem/tempo Actions type expects a broader Client type
-    hash = await (
-      Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
-    )(client, {
-      to: recipient,
-      amount,
-      memo: Hex.fromString(memo),
-      token: USDC_ADDRESSES[tempo.id],
-      // feePayer: true tells viem to omit feeToken from the user's signing payload
-      // and serialize with feePayerSignature: null — the relay co-signs
-      ...(sponsored ? { feePayer: true } : {}),
-    });
+    if (sponsored && relayPassword) {
+      // Sponsored: sign via dialog, then relay co-signs and broadcasts
+      hash = await signAndRelay(
+        tempoClient,
+        recipient,
+        amount,
+        memo,
+        relayPassword
+      );
+    } else {
+      // Self-pay: dialog signs and broadcasts atomically
+      hash = await (
+        Actions.token.transfer as (...args: unknown[]) => Promise<Hash>
+      )(tempoClient, {
+        to: recipient,
+        amount,
+        memo: Hex.fromString(memo),
+        token: USDC_ADDRESSES[tempo.id],
+      });
+    }
   } else {
     // wagmi v2 types don't infer extended chain IDs
     hash = await (writeContract as (...args: unknown[]) => Promise<Hash>)(

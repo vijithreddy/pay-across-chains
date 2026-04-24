@@ -18,17 +18,11 @@ const checks: Check[] = [];
 
 // --- File existence ---
 const relayRoutePath = join(SRC, "app/api/relay/route.ts");
-const relayTransportPath = join(SRC, "lib/relay-transport.ts");
 const sponsorTogglePath = join(SRC, "components/sponsor-toggle.tsx");
 
 checks.push({
   name: "file: api/relay/route.ts exists",
   pass: existsSync(relayRoutePath),
-});
-
-checks.push({
-  name: "file: lib/relay-transport.ts exists",
-  pass: existsSync(relayTransportPath),
 });
 
 checks.push({
@@ -101,27 +95,6 @@ checks.push({
   detail: "withRelay sends eth_fillTransaction to relay for gas estimation",
 });
 
-// --- Relay transport ---
-const relayTransport = readFileSync(relayTransportPath, "utf-8");
-
-checks.push({
-  name: "relay-transport: uses custom() viem transport",
-  pass: relayTransport.includes("custom("),
-  detail: "Must create a custom transport for JSON-RPC routing",
-});
-
-checks.push({
-  name: "relay-transport: sends Authorization Bearer header",
-  pass:
-    relayTransport.includes("Authorization") &&
-    relayTransport.includes("Bearer"),
-});
-
-checks.push({
-  name: "relay-transport: posts to /api/relay",
-  pass: relayTransport.includes("/api/relay"),
-});
-
 // --- Race engine ---
 const raceEngine = readFileSync(join(SRC, "lib/race-engine.ts"), "utf-8");
 
@@ -140,15 +113,37 @@ checks.push({
 });
 
 checks.push({
-  name: "race-engine: imports withRelay from viem/tempo",
-  pass: raceEngine.includes("withRelay"),
-  detail: "withRelay transport intercepts sponsored tx broadcast to relay",
+  name: "race-engine: uses signAndRelay for sponsored flow",
+  pass: raceEngine.includes("signAndRelay"),
+  detail:
+    "Dialog signs via eth_signTransaction, then relay co-signs and broadcasts",
 });
 
 checks.push({
-  name: "race-engine: builds sponsored client with withRelay transport",
-  pass: raceEngine.includes("buildSponsoredClient"),
-  detail: "Must wrap the wallet client transport for relay routing",
+  name: "race-engine: uses signTransaction (not sendTransaction) for sponsored",
+  pass: raceEngine.includes("signTransaction"),
+  detail:
+    "JSON-RPC accounts use eth_sendTransaction which broadcasts atomically — must use signTransaction instead",
+});
+
+checks.push({
+  name: "race-engine: uses prepareTransactionRequest for sponsored",
+  pass: raceEngine.includes("prepareTransactionRequest"),
+  detail: "Must prepare tx (gas, nonce) before signing",
+});
+
+checks.push({
+  name: "race-engine: posts half-signed tx to /api/relay",
+  pass:
+    raceEngine.includes("/api/relay") &&
+    raceEngine.includes("serializedTx"),
+  detail: "Half-signed tx sent to relay for co-signing + broadcast",
+});
+
+checks.push({
+  name: "race-engine: sends Bearer auth to relay",
+  pass: raceEngine.includes("Bearer"),
+  detail: "Relay password sent as Authorization header",
 });
 
 checks.push({

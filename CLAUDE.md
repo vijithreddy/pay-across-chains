@@ -136,17 +136,20 @@ Relay-based fee sponsorship — a server co-signs the tx and pays gas:
 
 Flow:
 1. User toggles "Sponsored" in payment form, enters relay password
-2. Race engine wraps Tempo client with withRelay(custom(client), relayTransport)
-3. Actions.token.transfer called with feePayer: true — omits feeToken from user sig
-4. Serialized tx has feePayerSignature: null — withRelay intercepts broadcast
-5. /api/relay receives half-signed tx, co-signs with FEE_PAYER_PRIVATE_KEY
-6. Relay broadcasts fully-signed tx, returns hash
+2. Race engine builds transfer call via Actions.token.transfer.call
+3. prepareTransactionRequest with feePayer: true — fills gas, nonce, omits feeToken
+4. signTransaction via Tempo Wallet dialog — signs but does NOT broadcast
+5. Half-signed serialized tx POSTed to /api/relay with Bearer auth
+6. Relay co-signs with FEE_PAYER_PRIVATE_KEY, broadcasts, returns hash
+
+Why not withRelay: JSON-RPC accounts (dialog wallets) use eth_sendTransaction
+which signs+broadcasts atomically. withRelay only intercepts eth_sendRawTransaction
+(local accounts). Must use signTransaction + manual relay post instead.
 
 Architecture:
 - /api/relay/route.ts — co-signs via TxEnvelopeTempo + Secp256k1.sign, broadcasts
-- src/lib/relay-transport.ts — custom viem transport routing to /api/relay with Bearer auth
 - src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio + password input
-- withRelay from viem/tempo with policy: "sign-and-broadcast"
+- signAndRelay() in race-engine.ts — prepareTransactionRequest + signTransaction + fetch relay
 
 Security:
 - FEE_PAYER_PRIVATE_KEY: server-only env var, NEVER NEXT_PUBLIC_
@@ -245,7 +248,6 @@ Dark financial terminal meets F1 race telemetry.
 - src/app/race/[id]/page.tsx — shareable race results page
 - src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio for Tempo fees
 - src/app/api/relay/route.ts — POST to co-sign sponsored tx, GET for health check
-- src/lib/relay-transport.ts — custom viem transport routing to /api/relay
 - src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
 - src/types/index.ts — shared types (Tab, MigrationCard)
 - evals/regression.eval.ts — 43-check regression suite (run before any changes)
