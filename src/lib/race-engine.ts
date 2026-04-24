@@ -125,15 +125,21 @@ async function signChain(
   return { hash, broadcastTime };
 }
 
-// Phase 2: Race — wait for all 3 receipts simultaneously, timer starts here
+/**
+ * Phase 2: Wait for tx confirmation and report timing.
+ * visualStart = shared start for live timer animation (all runners begin at 0)
+ * broadcastTime = when this chain's tx entered the mempool (for honest final time)
+ */
 async function raceConfirmation(
   chainId: number,
   hash: Hash,
-  raceStart: number,
+  visualStart: number,
+  broadcastTime: number,
   onUpdate: RaceParams["onUpdate"]
 ): Promise<ChainRaceState> {
   const name = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
-  onUpdate(chainId, { state: "racing", startTime: raceStart });
+  // Live timer ticks from visualStart so all 3 start at 0 simultaneously
+  onUpdate(chainId, { state: "racing", startTime: visualStart });
 
   try {
     // Can fail if: RPC is down, tx reverts, or receipt polling times out
@@ -153,15 +159,19 @@ async function raceConfirmation(
       feeToken = "ETH";
     }
 
+    // elapsedMs = real latency from broadcast (honest number for results table)
+    // startTime = visual start (for live timer that ticks from 0)
+    // endTime = when confirmed (freezes the live timer at the real elapsed value)
+    const realElapsed = endTime - broadcastTime;
     const result: ChainRaceState = {
       chainId,
       name,
       state: "confirmed",
       hash,
       receipt,
-      startTime: raceStart,
-      endTime,
-      elapsedMs: endTime - raceStart,
+      startTime: visualStart,
+      endTime: visualStart + realElapsed, // freeze live timer at the real elapsed value
+      elapsedMs: realElapsed,
       feeDisplay,
       feeToken,
     };
@@ -169,14 +179,15 @@ async function raceConfirmation(
     return result;
   } catch (err: unknown) {
     const endTime = performance.now();
+    const realElapsed = endTime - broadcastTime;
     const result: ChainRaceState = {
       chainId,
       name,
       state: "error",
       hash,
-      startTime: raceStart,
-      endTime,
-      elapsedMs: endTime - raceStart,
+      startTime: visualStart,
+      endTime: visualStart + realElapsed,
+      elapsedMs: realElapsed,
       error: err instanceof Error ? err.message : "Unknown error",
     };
     onUpdate(chainId, result);
@@ -230,14 +241,16 @@ export async function startRace(
   }
 
   // PHASE 2: Race for confirmations
-  // Each chain's timer starts from its broadcast moment (when the hash was received).
-  // This gives honest per-chain latency — Eth/Base don't show 0.1s just because
-  // they confirmed while the user was still signing Tempo.
+  // visualStart = shared moment when all 3 are signed (live timers all start at 0)
+  // broadcastTime = per-chain (when tx entered mempool — for honest final elapsed time)
+  // If a chain already confirmed during signing, waitForReceipt returns instantly
+  // and the timer freezes at the real elapsed time from broadcast
   // allSettled (not all) so one chain failing doesn't kill the others' results
+  const visualStart = performance.now();
   const results = await Promise.allSettled(
     signOrder.map((chainId) => {
       const { hash, broadcastTime } = signed[chainId]!;
-      return raceConfirmation(chainId, hash, broadcastTime, onUpdate);
+      return raceConfirmation(chainId, hash, visualStart, broadcastTime, onUpdate);
     })
   );
 
