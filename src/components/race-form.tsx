@@ -58,9 +58,9 @@ export function RaceForm({
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
   const [racing, setRacing] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "signing" | "racing" | "done">(
-    "idle"
-  );
+  const [phase, setPhase] = useState<
+    "idle" | "signing" | "waiting" | "racing" | "done"
+  >("idle");
   const [chainStates, setChainStates] = useState(makeInitialStates);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -73,6 +73,7 @@ export function RaceForm({
         ...prev,
         [chainId]: { ...prev[chainId], ...update },
       }));
+      if (update.state === "waiting") setPhase("waiting");
       if (update.state === "racing") setPhase("racing");
       // Fire confetti when Tempo wins — it should always confirm first
       if (
@@ -218,6 +219,20 @@ export function RaceForm({
         />
       )}
       {isSigning && <SigningStatus chainStates={chainStates} />}
+
+      {/* Waiting for confirmations — all signed, collecting results before replay */}
+      {phase === "waiting" && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-4">
+          <div className="w-8 h-8 border-2 border-[var(--tempo-primary)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-[var(--text-secondary)]">
+            Waiting for confirmations across all 3 chains...
+          </p>
+          <p className="text-xs text-[var(--text-dim)]">
+            Race replay starts once all transactions confirm
+          </p>
+        </div>
+      )}
+
       {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
       {isRacing && <StatusCards chainStates={chainStates} />}
       {allDone && <ResultsTable chainStates={chainStates} />}

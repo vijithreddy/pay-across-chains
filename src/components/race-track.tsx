@@ -24,6 +24,7 @@ function getTargetX(state: TxState): number {
     case "idle":
     case "signing":
     case "signed":
+    case "waiting":
       return START_X;
     case "racing":
       return START_X + RUNNER_TRAVEL * 0.8;
@@ -56,7 +57,8 @@ function RunnerFigure({
   const isFinished = state === "confirmed";
   const isError = state === "error";
   const fill = isError ? "#EF4444" : color;
-  const opacity = state === "idle" || state === "signing" ? 0.25 : 1;
+  const opacity =
+    state === "idle" || state === "signing" || state === "waiting" ? 0.25 : 1;
   const legDuration = 0.5;
 
   return (

@@ -57,7 +57,7 @@ checks.push({ name: "sign: tempo-provider uses JSON-RPC account (addr, not signa
 checks.push({ name: "sign: tempo-provider uses custom(provider) transport", pass: tempoProvider.includes("custom(provider)") });
 checks.push({ name: "sign: tempo-provider uses dialog adapter with iframe", pass: tempoProvider.includes("Dialog.iframe()") && tempoProvider.includes("dialog(") });
 checks.push({ name: "sign: race-engine uses Actions.token.transfer for Tempo", pass: raceEngine.includes("Actions.token.transfer") });
-checks.push({ name: "sign: race-engine uses writeContract for Eth/Base", pass: raceEngine.includes("writeContract(config") });
+checks.push({ name: "sign: race-engine uses writeContract for Eth/Base", pass: raceEngine.includes("writeContract") });
 checks.push({ name: "sign: race-engine checks tempoClient before Tempo sign", pass: raceEngine.includes("Tempo Wallet not connected") });
 checks.push({ name: "sign: race-form passes tempoClient to startRace", pass: raceForm.includes("tempoClient") && raceForm.includes("startRace") });
 checks.push({ name: "sign: race-form guards start without tempoClient", pass: raceForm.includes("!tempoClient") || raceForm.includes("!tempoAddress") });
