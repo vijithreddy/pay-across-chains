@@ -94,14 +94,14 @@ checks.push({ name: "funding: page passes tempoAddress to FundingChecklist", pas
 // 5b. BALANCE DISPLAY — handles loading, error, and data states
 // =====================================================
 checks.push({
-  name: "funding: handles isError state",
+  name: "funding: handles isError state for RPC failures",
   pass: fundingChecklist.includes("isError") || fundingChecklist.includes("error"),
-  detail: "Must show error state when RPC fails, not blank",
+  detail: "Must show error banner when RPC fails, not infinite shimmer",
 });
 checks.push({
-  name: "funding: handles isFetching in loading state",
-  pass: fundingChecklist.includes("isFetching"),
-  detail: "isLoading alone misses refetch states",
+  name: "funding: loading uses isLoading only (NOT isFetching)",
+  pass: fundingChecklist.includes("query.isLoading") && !fundingChecklist.includes("isFetching"),
+  detail: "isFetching causes shimmer flicker on every 10s background refetch",
 });
 
 // =====================================================

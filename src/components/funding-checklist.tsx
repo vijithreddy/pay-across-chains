@@ -89,6 +89,7 @@ export function FundingChecklist({
       required: MIN_BALANCES[chainId as keyof typeof MIN_BALANCES].label,
       bridgeLink: BRIDGE_LINKS[chainId as keyof typeof BRIDGE_LINKS],
       loading: query.isLoading,
+      error: query.isError,
     };
   });
 
@@ -100,9 +101,23 @@ export function FundingChecklist({
   if (!mounted) return null;
 
   const fundedCount = statuses.filter((s) => s.funded).length;
+  const failedChains = statuses.filter((s) => s.error).map((s) => s.name);
 
   return (
     <div className="gradient-border p-6 space-y-5">
+      {/* RPC error banner */}
+      {failedChains.length > 0 && (
+        <div className="flex items-start gap-3 rounded-xl bg-[var(--warning)]/10 border border-[var(--warning)]/20 px-4 py-3">
+          <span className="text-[var(--warning)] text-lg leading-none mt-0.5">&#x26A0;</span>
+          <div>
+            <p className="text-sm font-medium text-[var(--warning)]">RPC endpoints unavailable</p>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Could not reach {failedChains.join(", ")}. Check your RPC configuration or try again.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h2 className="font-[var(--font-bricolage)] text-xl font-bold text-white">
@@ -152,6 +167,8 @@ export function FundingChecklist({
               <div className="flex items-center gap-3">
                 {s.loading ? (
                   <div className="h-4 w-20 rounded-full bg-[var(--bg-elevated)] animate-pulse" />
+                ) : s.error ? (
+                  <span className="text-xs text-[var(--text-dim)]">Unavailable</span>
                 ) : (
                   <>
                     <span className="font-mono text-sm text-white tabular-nums">
