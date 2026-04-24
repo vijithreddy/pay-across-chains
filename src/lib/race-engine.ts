@@ -8,7 +8,7 @@ import {
   type Transport,
   type Account,
 } from "viem";
-import { writeContract, switchChain } from "@wagmi/core";
+import { writeContract } from "@wagmi/core";
 import { mainnet, base } from "wagmi/chains";
 import { Actions } from "viem/tempo";
 import { Hex } from "ox";
@@ -79,17 +79,9 @@ async function signChain(
 ): Promise<{ hash: Hash; broadcastTime: number }> {
   onUpdate(chainId, { state: "signing" });
 
-  if (chainId !== tempo.id) {
-    // Switch MetaMask to the target chain (not needed for Tempo — separate wallet)
-    try {
-      // wagmi v2 types don't infer extended chain IDs from tempo.extend()
-      await (switchChain as (...args: unknown[]) => Promise<unknown>)(config, {
-        chainId,
-      });
-    } catch {
-      // May throw if already on the correct chain, ignore
-    }
-  }
+  // No manual switchChain — writeContract with chainId handles switching.
+  // Manual switchChain before writeContract causes double-switch conflicts
+  // with wallets like Phantom that handle chain switching internally.
 
   let hash: Hash;
 
