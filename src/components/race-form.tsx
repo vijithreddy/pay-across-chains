@@ -102,17 +102,18 @@ export function RaceForm({
     setPhase("signing");
     confettiFired.current = false;
     setChainStates(makeInitialStates());
+    let raceResults: ChainRaceState[] = [];
     try {
       // Dry run uses mock timing; real run uses actual wallet signing
       if (dryRun) {
-        await startDryRace({
+        raceResults = await startDryRace({
           recipient: (recipient || DRY_RUN_RECIPIENT) as `0x${string}`,
           amount,
           memo,
           onUpdate: handleUpdate,
         });
       } else {
-        await startRace({
+        raceResults = await startRace({
           recipient: recipient as `0x${string}`,
           amount,
           memo,
@@ -129,42 +130,42 @@ export function RaceForm({
     setRacing(false);
     setPhase("done");
 
-    // Auto-save race result for sharing
-    saveRaceResult(recipient || DRY_RUN_RECIPIENT, amount, memo);
+    // Auto-save using the returned results (not React state which hasn't re-rendered yet)
+    if (raceResults.length > 0) {
+      saveRaceResult(raceResults, recipient || DRY_RUN_RECIPIENT, amount, memo);
+    }
   };
 
   /** Saves the completed race to the API and generates a share URL */
   const saveRaceResult = async (
+    results: ChainRaceState[],
     raceRecipient: string,
     raceAmount: string,
     raceMemo: string
   ) => {
     try {
       const id = crypto.randomUUID().slice(0, 8);
-      const confirmedChains = CHAIN_IDS.map((cid) => {
-        const cs = chainStates[cid];
-        return {
-          chainId: cid,
-          name: cs?.name ?? "",
-          elapsedMs: cs?.elapsedMs ?? 0,
-          feeDisplay: cs?.feeDisplay ?? "",
-          feeToken: cs?.feeToken ?? "",
-          hash: cs?.hash ?? "",
-          state: (cs?.state === "confirmed" ? "confirmed" : "error") as
-            | "confirmed"
-            | "error",
-          error: cs?.error,
-        };
-      });
+      const chains = results.map((cs) => ({
+        chainId: cs.chainId,
+        name: cs.name,
+        elapsedMs: cs.elapsedMs ?? 0,
+        feeDisplay: cs.feeDisplay ?? "",
+        feeToken: cs.feeToken ?? "",
+        hash: cs.hash ?? "",
+        state: (cs.state === "confirmed" ? "confirmed" : "error") as
+          | "confirmed"
+          | "error",
+        error: cs.error,
+      }));
       const winner =
-        confirmedChains
+        chains
           .filter((c) => c.state === "confirmed")
           .sort((a, b) => a.elapsedMs - b.elapsedMs)[0]?.name ?? "None";
 
       const body: RaceResult = {
         id,
         timestamp: Date.now(),
-        chains: confirmedChains,
+        chains,
         winner,
         recipient: raceRecipient,
         amount: raceAmount,
