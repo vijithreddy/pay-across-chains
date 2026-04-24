@@ -197,7 +197,11 @@ export function RaceForm({
     }
   };
 
-  const allDone = CHAIN_IDS.every(
+  // Only check enabled chains — disabled chains stay "idle" and should not block completion
+  const activeChains = enabledChains
+    ? CHAIN_IDS.filter((id) => enabledChains.has(id))
+    : CHAIN_IDS;
+  const allDone = activeChains.every(
     (id) =>
       chainStates[id]?.state === "confirmed" ||
       chainStates[id]?.state === "error"
