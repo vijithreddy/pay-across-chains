@@ -33,27 +33,33 @@ real explorer links. Built for a Tempo Solutions Engineer interview.
 
 ## Dual-Wallet Architecture
 Two separate wallet connections — NOT the same address:
-- **MetaMask** (via RainbowKit/wagmi): signs Ethereum + Base ERC-20 transfers
+- **EVM Wallet** (MetaMask, Phantom, or Coinbase via RainbowKit/wagmi): signs Ethereum + Base ERC-20 transfers
 - **Tempo Wallet** (via accounts SDK): signs native Tempo type 0x76 transfers
 
+User connects ONE EVM wallet at a time (MetaMask OR Phantom OR Coinbase)
+plus Tempo Wallet separately. Both wallets installed simultaneously is fine.
+
 Why two wallets:
-- MetaMask cannot sign Tempo's custom tx type (0x76)
+- EVM wallets cannot sign Tempo's custom tx type (0x76)
 - Tempo Wallet uses WebAuthn/passkeys — signing via embedded dialog
-- wagmi manages MetaMask; accounts SDK manages Tempo independently
+- wagmi manages EVM wallet; accounts SDK manages Tempo independently
 
 Critical config:
 - `multiInjectedProviderDiscovery: false` in wagmi config — prevents
-  accounts SDK's EIP-6963 announcement from hijacking MetaMask connection
+  accounts SDK's EIP-6963 announcement from hijacking EVM wallet connection
 - TempoProvider uses React context, NOT wagmi hooks — zero cross-contamination
+- Use RainbowKit's built-in wallet connectors ONLY — never raw `injected()`
 
-## Wagmi Config (MetaMask / Eth+Base)
+## Wagmi Config (EVM Wallets / Eth+Base)
 ```
 // src/lib/wagmi.ts
-import { createConfig, http } from "wagmi"
+import { createConfig } from "wagmi"
 import { connectorsForWallets } from "@rainbow-me/rainbowkit"
-import { metaMaskWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets"
+import { metaMaskWallet, phantomWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets"
 
-const connectors = connectorsForWallets([...], { appName, projectId })
+const connectors = connectorsForWallets([
+  { groupName: "Wallets", wallets: [metaMaskWallet, phantomWallet, coinbaseWallet, walletConnectWallet] }
+], { appName, projectId })
 
 createConfig({
   chains: [mainnet, base, tempo],
@@ -62,6 +68,10 @@ createConfig({
   transports: { ... },
 })
 ```
+
+NEVER use raw `injected()` from wagmi/connectors — causes infinite
+connect-event loops when multiple wallet extensions are installed.
+RainbowKit's wallet connectors handle event dedup and lifecycle correctly.
 
 ## Tempo Wallet Config (accounts SDK)
 ```
@@ -257,7 +267,7 @@ hydration guards, timing, funding, UI components, file existence, TypeScript bui
 Full suite (100+ checks): run all eval files:
 - evals/regression.eval.ts (43 checks)
 - evals/signing-flow.eval.ts (10 checks)
-- evals/dual-connection.eval.ts (14 checks)
+- evals/dual-connection.eval.ts (20 checks)
 - evals/hydration.eval.ts (4 checks)
 - evals/race-history.eval.ts (15 checks)
 - evals/sponsored-fees.eval.ts (30 checks)
@@ -284,6 +294,12 @@ VERCEL_TOKEN
 - Never use getAccount({ signable: true }) for Tempo — dialog handles signing
 - Never put tempoWallet connector in wagmi config — use accounts SDK directly
 - Never set multiInjectedProviderDiscovery to true — breaks dual wallet
+- Never use raw `injected()` from wagmi/connectors — causes infinite connect
+  event loops when multiple wallet extensions installed. Use RainbowKit wallets.
+- Never remove switchChain before writeContract — wallet provider needs correct
+  chain for simulation. Without it, USDC transfer reverts "Unexpected error".
+- Never enable feePayer in Provider.create on preview deploys — Vercel
+  deployment protection returns HTML auth page, crashing Tempo signing flow
 - Never stop mid-build to ask for confirmation — just build
 
 

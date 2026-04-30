@@ -98,6 +98,51 @@ checks.push({
   detail: "getWalletClient goes through wagmi which would use MetaMask, not Tempo Wallet",
 });
 
+// --- Wallet connector checks ---
+checks.push({
+  name: "wagmi config: uses RainbowKit metaMaskWallet (not raw injected)",
+  pass: wagmiConfig.includes("metaMaskWallet") && !wagmiConfig.includes("from \"wagmi/connectors\""),
+  detail: "Raw injected() causes infinite connect-event loops with multiple extensions",
+});
+
+checks.push({
+  name: "wagmi config: uses RainbowKit phantomWallet",
+  pass: wagmiConfig.includes("phantomWallet"),
+  detail: "Phantom must be a named wallet option via RainbowKit",
+});
+
+checks.push({
+  name: "wagmi config: does NOT import injected from wagmi/connectors",
+  pass: !wagmiConfig.includes("from \"wagmi/connectors\"") &&
+        !wagmiConfig.includes("from 'wagmi/connectors'"),
+  detail: "Raw injected() causes infinite connect loops — use RainbowKit wallet connectors",
+});
+
+// --- Race engine chain switching ---
+const raceEngineForSwitch = readFileSync(join(SRC, "lib/race-engine.ts"), "utf-8");
+
+checks.push({
+  name: "race-engine: uses switchChain before writeContract",
+  pass: raceEngineForSwitch.includes("switchChain"),
+  detail: "switchChain required so wallet provider simulates on correct chain",
+});
+
+// --- Signing failure handling ---
+const raceForm = readFileSync(join(SRC, "components/race-form.tsx"), "utf-8");
+
+checks.push({
+  name: "race-form: handles signing error with raceError state",
+  pass: raceForm.includes("raceError"),
+  detail: "On signing failure, must show error — not blank screen",
+});
+
+// --- feePayer safety ---
+checks.push({
+  name: "tempo-provider: feePayer is disabled (commented out)",
+  pass: !tempoProvider.match(/^\s*feePayer:/m) || tempoProvider.includes("// feePayer"),
+  detail: "feePayer must be disabled until sponsored fees are fixed — breaks preview deploys",
+});
+
 // --- Providers wrapper checks ---
 const providers = readFileSync(join(SRC, "components/providers.tsx"), "utf-8");
 
