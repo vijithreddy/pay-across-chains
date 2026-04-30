@@ -286,6 +286,8 @@ VERCEL_TOKEN
 
 ## Session Rules
 - Start every session: read CLAUDE.md and CHANGES.md
+- Start every session: sync .env → Vercel envs (read .env, compare with
+  `vercel env ls`, add any missing NEXT_PUBLIC_* vars to production)
 - End every session: run /summarize
 - Before any code change: run `npx tsx evals/regression.eval.ts`
 - Never use testnet
