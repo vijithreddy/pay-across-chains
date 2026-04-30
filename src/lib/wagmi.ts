@@ -5,21 +5,27 @@ import { mainnet, base } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
   metaMaskWallet,
+  phantomWallet,
   coinbaseWallet,
   walletConnectWallet,
-  injectedWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { tempo, transports } from "./chains";
 
+// Use RainbowKit's battle-tested wallet connectors — NOT raw injected().
+// Raw injected() causes infinite connect-event loops when both MetaMask
+// and Phantom are installed (provider.on('connect') → onConnect → re-setup).
+// RainbowKit's wallets handle event dedup and lifecycle correctly.
+// phantomWallet uses getInjectedConnector({ namespace: 'phantom.ethereum' })
+// which targets window.phantom.ethereum directly — no EIP-6963 needed.
 const connectors = connectorsForWallets(
   [
     {
       groupName: "Wallets",
       wallets: [
         metaMaskWallet,
+        phantomWallet,
         coinbaseWallet,
         walletConnectWallet,
-        injectedWallet,
       ],
     },
   ],
