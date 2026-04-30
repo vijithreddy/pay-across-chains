@@ -25,6 +25,7 @@ const wagmi = read("lib/wagmi.ts");
 const providers = read("components/providers.tsx");
 const tempoProvider = read("components/tempo-provider.tsx");
 const raceEngine = read("lib/race-engine.ts");
+const signChainMod = read("lib/sign-chain.ts");
 const raceForm = read("components/race-form.tsx");
 const page = read("app/page.tsx");
 const chains = read("lib/chains.ts");
@@ -56,9 +57,9 @@ checks.push({ name: "sign: tempo-provider uses createWalletClient", pass: tempoP
 checks.push({ name: "sign: tempo-provider uses JSON-RPC account (addr, not signable)", pass: tempoProvider.includes("account: addr") && !tempoProvider.includes("signable: true") });
 checks.push({ name: "sign: tempo-provider uses custom(provider) transport", pass: tempoProvider.includes("custom(provider)") });
 checks.push({ name: "sign: tempo-provider uses dialog adapter with iframe", pass: tempoProvider.includes("Dialog.iframe()") && tempoProvider.includes("dialog(") });
-checks.push({ name: "sign: race-engine uses Actions.token.transfer for Tempo", pass: raceEngine.includes("Actions.token.transfer") });
-checks.push({ name: "sign: race-engine uses writeContract for Eth/Base", pass: raceEngine.includes("writeContract") });
-checks.push({ name: "sign: race-engine checks tempoClient before Tempo sign", pass: raceEngine.includes("Tempo Wallet not connected") });
+checks.push({ name: "sign: sign-chain uses Actions.token.transfer for Tempo", pass: signChainMod.includes("Actions.token.transfer") });
+checks.push({ name: "sign: sign-chain uses writeContract for Eth/Base", pass: signChainMod.includes("writeContract") });
+checks.push({ name: "sign: sign-chain checks tempoClient before Tempo sign", pass: signChainMod.includes("Tempo Wallet not connected") });
 checks.push({ name: "sign: race-form passes tempoClient to startRace", pass: raceForm.includes("tempoClient") && raceForm.includes("startRace") });
 checks.push({ name: "sign: race-form guards start without tempoClient", pass: raceForm.includes("!tempoClient") || raceForm.includes("!tempoAddress") });
 
@@ -115,7 +116,7 @@ checks.push({ name: "ui: tempo-connect uses useTempoWallet", pass: tempoConnect.
 // 7. FILES EXIST
 // =====================================================
 const requiredFiles = [
-  "lib/wagmi.ts", "lib/chains.ts", "lib/abi.ts", "lib/race-engine.ts",
+  "lib/wagmi.ts", "lib/chains.ts", "lib/abi.ts", "lib/race-engine.ts", "lib/sign-chain.ts", "lib/replay.ts", "lib/dry-race.ts",
   "components/providers.tsx", "components/tempo-provider.tsx", "components/tempo-connect.tsx",
   "components/funding-checklist.tsx", "components/race-form.tsx", "components/race-track.tsx",
   "components/results-table.tsx", "components/migration-cards.tsx",

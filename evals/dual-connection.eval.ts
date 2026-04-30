@@ -118,12 +118,12 @@ checks.push({
   detail: "Raw injected() causes infinite connect loops — use RainbowKit wallet connectors",
 });
 
-// --- Race engine chain switching ---
-const raceEngineForSwitch = readFileSync(join(SRC, "lib/race-engine.ts"), "utf-8");
+// --- Chain switching (in sign-chain.ts or race-engine.ts) ---
+const signChainFile = readFileSync(join(SRC, "lib/sign-chain.ts"), "utf-8");
 
 checks.push({
-  name: "race-engine: uses switchChain before writeContract",
-  pass: raceEngineForSwitch.includes("switchChain"),
+  name: "sign-chain: uses switchChain before writeContract",
+  pass: signChainFile.includes("switchChain"),
   detail: "switchChain required so wallet provider simulates on correct chain",
 });
 
