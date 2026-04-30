@@ -70,6 +70,9 @@ function getPublicClient(chainId: number) {
   });
 }
 
+/* eslint-disable no-console */
+const LOG = "[race]";
+
 /** Phase 1: Sign and broadcast one chain — returns hash */
 async function signChain(
   chainId: SupportedChainId,
@@ -80,16 +83,20 @@ async function signChain(
   onUpdate: RaceParams["onUpdate"],
   sponsored?: boolean
 ): Promise<Hash> {
+  const chain = CHAIN_NAMES[chainId as keyof typeof CHAIN_NAMES];
+  console.log(`${LOG} signChain START chain=${chain} (${chainId}) sponsored=${!!sponsored}`);
   onUpdate(chainId, { state: "signing" });
 
   if (chainId !== tempo.id) {
+    console.log(`${LOG} switchChain → ${chain}`);
     try {
       // wagmi v2 types don't infer extended chain IDs from tempo.extend()
       await (switchChain as (...args: unknown[]) => Promise<unknown>)(config, {
         chainId,
       });
+      console.log(`${LOG} switchChain → ${chain} OK`);
     } catch {
-      // May throw if already on the correct chain
+      console.log(`${LOG} switchChain → ${chain} skipped (already on chain)`);
     }
   }
 
@@ -124,6 +131,7 @@ async function signChain(
     );
   }
 
+  console.log(`${LOG} signChain DONE chain=${chain} hash=${hash.slice(0, 14)}...`);
   onUpdate(chainId, { state: "signed", hash });
   return hash;
 }
@@ -259,10 +267,14 @@ export async function startRace(
   const signOrder = allChains.filter(
     (id) => !params.enabledChains || params.enabledChains.has(id)
   );
+  console.log(`${LOG} ======== RACE START ========`);
+  console.log(`${LOG} recipient=${recipient.slice(0, 10)}... amount=${amount} sponsored=${!!params.sponsored}`);
+  console.log(`${LOG} enabledChains=[${signOrder.map((id) => CHAIN_NAMES[id as keyof typeof CHAIN_NAMES]).join(", ")}]`);
   const hashes: Partial<Record<number, { hash: Hash; broadcastTime: number }>> =
     {};
 
   // PHASE 1: Sign each transaction sequentially
+  console.log(`${LOG} PHASE 1: Signing ${signOrder.length} chains...`);
   for (const chainId of signOrder) {
     try {
       const hash = await signChain(
@@ -287,14 +299,17 @@ export async function startRace(
           onUpdate(id, { state: "idle" });
         }
       }
+      console.log(`${LOG} SIGNING FAILED chain=${name}: ${err instanceof Error ? err.message.slice(0, 100) : "Unknown"}`);
       throw new Error(
         `Signing failed on ${name}: ${err instanceof Error ? err.message : "Unknown"}`
       );
     }
   }
+  console.log(`${LOG} PHASE 1 DONE: all ${signOrder.length} chains signed`);
 
   // PHASE 2: Wait for all 3 confirmations silently
   // Show "waiting" state while confirmations come in
+  console.log(`${LOG} PHASE 2: Waiting for confirmations...`);
   for (const chainId of signOrder) {
     onUpdate(chainId, { state: "waiting" });
   }
@@ -324,9 +339,22 @@ export async function startRace(
         } as ConfirmationResult)
   );
 
+  // Log confirmation results
+  for (const r of results) {
+    if (r.confirmed) {
+      console.log(`${LOG} CONFIRMED ${r.name}: ${r.elapsedMs.toFixed(0)}ms fee=${r.feeDisplay}`);
+    } else {
+      console.log(`${LOG} FAILED ${r.name}: ${r.error}`);
+    }
+  }
+
   // PHASE 3: Replay the race as animation with proportional timing
-  return replayRace(results, onUpdate);
+  console.log(`${LOG} PHASE 3: Replaying race animation...`);
+  const finalStates = await replayRace(results, onUpdate);
+  console.log(`${LOG} ======== RACE COMPLETE ========`);
+  return finalStates;
 }
+/* eslint-enable no-console */
 
 // ============================================
 // DRY RACE — mock timing, no real transactions
