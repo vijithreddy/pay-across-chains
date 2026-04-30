@@ -80,14 +80,16 @@ async function signChain(
   onUpdate(chainId, { state: "signing" });
 
   if (chainId !== tempo.id) {
-    // Switch MetaMask to the target chain (not needed for Tempo — separate wallet)
+    // Switch wallet to target chain before writeContract — required so the
+    // wallet provider simulates on the correct chain. Safe with RainbowKit's
+    // built-in wallet connectors (metaMaskWallet, phantomWallet, etc.)
     try {
       // wagmi v2 types don't infer extended chain IDs from tempo.extend()
       await (switchChain as (...args: unknown[]) => Promise<unknown>)(config, {
         chainId,
       });
     } catch {
-      // May throw if already on the correct chain, ignore
+      // May throw if already on the correct chain — safe to ignore
     }
   }
 

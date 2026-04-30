@@ -60,6 +60,7 @@ export function RaceForm({
   const [phase, setPhase] = useState<"idle" | "signing" | "racing" | "done">(
     "idle"
   );
+  const [raceError, setRaceError] = useState<string>();
   const [chainStates, setChainStates] = useState(makeInitialStates);
   const confettiFired = useRef(false);
 
@@ -97,6 +98,7 @@ export function RaceForm({
     }
     setRacing(true);
     setPhase("signing");
+    setRaceError(undefined);
     confettiFired.current = false;
     setChainStates(makeInitialStates());
     try {
@@ -118,13 +120,16 @@ export function RaceForm({
           onUpdate: handleUpdate,
         });
       }
+      setPhase("done");
     } catch (err) {
-      // Race can fail if user rejects a wallet prompt or RPC is down
-      if (process.env.NODE_ENV === "development")
-        console.error("[race] Error:", err);
+      // Signing failed or rejected — return to form with error message
+      const msg = err instanceof Error ? err.message : "Transaction failed";
+      // Extract short reason from verbose viem error
+      const reasonMatch = msg.match(/reason:\s*(.+?)(?:\n|$)/);
+      setRaceError(reasonMatch?.[1] ?? msg.split("\n")[0]);
+      setPhase("idle");
     }
     setRacing(false);
-    setPhase("done");
   };
 
   const allDone = CHAIN_IDS.every(
@@ -144,6 +149,12 @@ export function RaceForm({
         >
           <ArrowLeft className="size-3" /> Back to checklist
         </button>
+      )}
+
+      {phase === "idle" && raceError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono">
+          {raceError}
+        </div>
       )}
 
       {phase === "idle" && (

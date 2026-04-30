@@ -1,59 +1,28 @@
 "use client";
 
 import { createConfig } from "wagmi";
-import { injected } from "wagmi/connectors";
 import { mainnet, base } from "wagmi/chains";
 import { connectorsForWallets } from "@rainbow-me/rainbowkit";
 import {
+  metaMaskWallet,
   phantomWallet,
   coinbaseWallet,
   walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 import { tempo, transports } from "./chains";
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// Phantom injects window.ethereum AND sets isMetaMask=true, which causes
-// metaMaskWallet connector to pick up Phantom's provider instead of MetaMask.
-// This custom wallet explicitly finds MetaMask while excluding Phantom.
-function findMetaMaskProvider(): any {
-  if (typeof window === "undefined") return undefined;
-  const eth = window.ethereum as any;
-  if (!eth) return undefined;
-  // Multi-provider array (when multiple wallets installed)
-  if (eth.providers) {
-    return eth.providers.find(
-      (p: any) => p.isMetaMask && !p.isPhantom
-    );
-  }
-  // Single provider
-  if (eth.isMetaMask && !eth.isPhantom) return eth;
-  return undefined;
-}
-
-const safeMetaMaskWallet = (): any => ({
-  id: "metaMask",
-  name: "MetaMask",
-  iconUrl:
-    "https://upload.wikimedia.org/wikipedia/commons/3/36/MetaMask_Fox.svg",
-  iconBackground: "#fff",
-  installed: Boolean(findMetaMaskProvider()),
-  createConnector: () =>
-    injected({
-      target: () => ({
-        id: "metaMask",
-        name: "MetaMask",
-        provider: findMetaMaskProvider(),
-      }),
-    }),
-});
-
+// Use RainbowKit's battle-tested wallet connectors — NOT raw injected().
+// Raw injected() causes infinite connect-event loops when both MetaMask
+// and Phantom are installed (provider.on('connect') → onConnect → re-setup).
+// RainbowKit's wallets handle event dedup and lifecycle correctly.
+// phantomWallet uses getInjectedConnector({ namespace: 'phantom.ethereum' })
+// which targets window.phantom.ethereum directly — no EIP-6963 needed.
 const connectors = connectorsForWallets(
   [
     {
       groupName: "Wallets",
       wallets: [
-        safeMetaMaskWallet,
+        metaMaskWallet,
         phantomWallet,
         coinbaseWallet,
         walletConnectWallet,
@@ -65,8 +34,6 @@ const connectors = connectorsForWallets(
     projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo",
   }
 );
-
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export const config = createConfig({
   chains: [mainnet, base, tempo] as unknown as readonly [
