@@ -11,7 +11,8 @@ real explorer links. Built for a Tempo Solutions Engineer interview.
 1. Land on app → split hero: intro left, idle race track preview right
 2. User connects MetaMask via RainbowKit ConnectButton
 3. User signs in to Tempo Wallet via accounts SDK embedded dialog
-4. Funding checklist reads USDC balances on all 3 chains via token.balanceOf:
+4. Funding checklist reads USDC balances on all 3 chains via token.balanceOf.
+   Users can toggle Eth/Base off (click chain icon) to skip and save gas:
    - Ethereum: need ≥ 1 USDC (gas paid in ETH separately)
    - Base: need ≥ 1 USDC (gas paid in ETH separately)
    - Tempo: need ≥ 1.5 USDC (covers transfer + USDC gas fee)
@@ -20,14 +21,14 @@ real explorer links. Built for a Tempo Solutions Engineer interview.
    - Recipient: any valid address
    - Amount: 1 USDC
    - Memo: "Invoice #1042 — Demo Payment" (Tempo exclusive)
-7. "SEND ON ALL THREE" → sequential signing:
+7. "SEND ON ALL THREE" → sequential signing (enabled chains only):
    - Ethereum: MetaMask prompt (writeContract, ERC-20 transfer)
    - Base: MetaMask prompt (writeContract, ERC-20 transfer)
    - Tempo: Tempo Wallet dialog (Actions.token.transfer, native type 0x76)
-8. All 3 signed → race phase: Promise.allSettled waitForTransactionReceipt
-9. SVG 3-lane track animates, runners move on real tx state
-10. Tempo confirms (~500ms) → confetti, timer freezes, victory pose
-11. Base confirms (~3s), Ethereum confirms (~45s)
+8. All signed → waiting phase: spinner while confirmations come in
+9. All confirmed → replay phase: animated race with proportional timing
+10. Tempo finishes first (~500ms) → confetti → Base (~3s) → Ethereum (~45s)
+11. Times shown are REAL from broadcast, not replay animation time
 12. Results table: time, fee, fee token, finality, memo — with explorer links
 
 ## Dual-Wallet Architecture
@@ -107,21 +108,67 @@ export const tempo = tempoBase.extend({
 })
 ```
 
-## Race Engine — Two Phases
-Phase 1 — Sequential signing (one wallet prompt at a time):
-- Ethereum: wagmi writeContract → MetaMask prompt → hash + broadcastTime
-- Base: wagmi writeContract → MetaMask prompt → hash + broadcastTime
-- Tempo: Actions.token.transfer → Tempo Wallet dialog → hash + broadcastTime
+## Chain Toggle
+Users can disable Eth/Base to save gas during testing:
+- Click the chain icon circle in funding checklist to toggle
+- Disabled chains show "SKIPPED", grey out, skip signing
+- Tempo cannot be disabled — it's always included
+- Progress bar and allFunded only count enabled chains
+- `enabledChains: Set<number>` flows from page → checklist → race form → engine
+- Race engine filters `signOrder` to only include enabled chains
 
-Phase 2 — Simultaneous confirmation race:
-- Promise.allSettled → waitForTransactionReceipt for all 3
-- Each chain's elapsed time measured from its own broadcastTime
-- This gives honest per-chain latency
+## Race Engine — Three Phases (Replay Architecture)
+The race is NOT live — it's a replay of real data. This avoids timing
+issues from sequential signing (Eth/Base confirming during Tempo signing).
+
+Phase 1 — Sequential signing:
+- Ethereum: wagmi writeContract → MetaMask prompt → hash
+- Base: wagmi writeContract → MetaMask prompt → hash
+- Tempo: Actions.token.transfer → Tempo Wallet dialog → hash
+- Only enabled chains are signed (disabled chains skipped)
+
+Phase 2 — Silent confirmation wait:
+- UI shows spinner: "Waiting for confirmations..."
+- Promise.allSettled → waitForTransactionReceipt for all signed chains
+- Collects real elapsed times, fees, receipts
+- No animation yet — just data collection
+
+Phase 3 — Animated replay:
+- replayRace() schedules onUpdate calls at proportional times
+- All runners start at 0 simultaneously
+- Each chain finishes at (realTime / maxTime) * REPLAY_DURATION
+- REPLAY_DURATION capped at 10s so Ethereum's 45s doesn't bore users
+- Times shown are REAL (from broadcastTime), not replay time
+- Confetti fires when Tempo (winner) crosses finish
+
+## Sponsored Fees (Tempo Exclusive)
+Relay-based fee sponsorship — a server co-signs the tx and pays gas:
+
+Flow:
+1. User toggles "Sponsored" in payment form
+2. Race engine passes feePayer: true to Actions.token.transfer
+3. Provider.create({ feePayer: '/api/relay' }) routes sponsored txs to relay
+4. Provider's internal transport handles eth_fillTransaction → relay (gas estimation)
+5. After dialog signs, routes eth_signRawTransaction → relay (co-signing)
+6. Relay co-signs with FEE_PAYER_PRIVATE_KEY, client broadcasts
+
+Architecture:
+- Provider.create with feePayer: '/api/relay' — canonical Tempo pattern
+- /api/relay/route.ts — handles eth_signRawTransaction, eth_sendRawTransaction, eth_fillTransaction
+- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio (no password needed)
+- Same-origin auth — Provider transport uses http() without auth headers
+
+Security:
+- FEE_PAYER_PRIVATE_KEY: server-only env var, NEVER NEXT_PUBLIC_
+- RELAY_PASSWORD: server-only env var, sent as Bearer token
+- Relay returns 401 for unauthenticated requests
+- Fee payer is a secp256k1 account (not passkey), funded with USDC on Tempo
 
 ## Transaction Details
 - Ethereum: standard ERC-20 USDC transfer via wagmi writeContract
 - Base: standard ERC-20 USDC transfer via wagmi writeContract
 - Tempo: Actions.token.transfer from viem/tempo — native type 0x76, with memo
+- Tempo (sponsored): same but with feePayer: true, relay co-signs and pays gas
 - Fee calculation: gasUsed * effectiveGasPrice, formatEther for all chains
 
 ## Dry Race Mode
@@ -201,6 +248,13 @@ Dark financial terminal meets F1 race telemetry.
 - src/components/race-track.tsx — SVG track with animated stick-figure runners
 - src/components/results-table.tsx — terminal-style results with pill badges
 - src/components/funding-checklist.tsx — balance checks with chain-colored borders
+- src/components/shared-race-view.tsx — public race result page (no wallet needed)
+- src/lib/storage.ts — race result persistence (Vercel KV with in-memory fallback)
+- src/app/api/race/route.ts — POST to save race result
+- src/app/api/race/[id]/route.ts — GET to load race result
+- src/app/race/[id]/page.tsx — shareable race results page
+- src/components/sponsor-toggle.tsx — Self-pay / Sponsored radio for Tempo fees
+- src/app/api/relay/route.ts — POST to co-sign sponsored tx, GET for health check
 - src/components/migration-cards.tsx — 6 EVM→Tempo code comparison cards
 - src/types/index.ts — shared types (Tab, MigrationCard)
 - evals/regression.eval.ts — 43-check regression suite (run before any changes)
@@ -210,11 +264,13 @@ Run before any code change: `npx tsx evals/regression.eval.ts`
 43 checks covering: architecture, signing flow, dual-connection isolation,
 hydration guards, timing, funding, UI components, file existence, TypeScript build.
 
-Full suite (71 checks): run all 4 eval files:
+Full suite (100+ checks): run all eval files:
 - evals/regression.eval.ts (43 checks)
 - evals/signing-flow.eval.ts (10 checks)
-- evals/dual-connection.eval.ts (14 checks)
+- evals/dual-connection.eval.ts (20 checks)
 - evals/hydration.eval.ts (4 checks)
+- evals/race-history.eval.ts (15 checks)
+- evals/sponsored-fees.eval.ts (30 checks)
 
 ## Environment Variables
 NEXT_PUBLIC_ETH_RPC
@@ -224,6 +280,8 @@ NEXT_PUBLIC_USDC_ETHEREUM
 NEXT_PUBLIC_USDC_BASE
 NEXT_PUBLIC_USDC_TEMPO
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+FEE_PAYER_PRIVATE_KEY (server-only — relay's Tempo private key)
+RELAY_PASSWORD (server-only — shared secret for relay auth)
 VERCEL_TOKEN
 
 ## Session Rules
@@ -242,6 +300,8 @@ VERCEL_TOKEN
   event loops when multiple wallet extensions installed. Use RainbowKit wallets.
 - Never remove switchChain before writeContract — wallet provider needs correct
   chain for simulation. Without it, USDC transfer reverts "Unexpected error".
+- Never enable feePayer in Provider.create on preview deploys — Vercel
+  deployment protection returns HTML auth page, crashing Tempo signing flow
 - Never stop mid-build to ask for confirmation — just build
 
 

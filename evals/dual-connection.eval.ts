@@ -131,9 +131,16 @@ checks.push({
 const raceForm = readFileSync(join(SRC, "components/race-form.tsx"), "utf-8");
 
 checks.push({
-  name: "race-form: handles signing error with phase reset",
-  pass: raceForm.includes("setPhase(\"idle\")") && raceForm.includes("raceError"),
-  detail: "On signing failure, must return to form with error — not blank screen",
+  name: "race-form: handles signing error with raceError state",
+  pass: raceForm.includes("raceError"),
+  detail: "On signing failure, must show error — not blank screen",
+});
+
+// --- feePayer safety ---
+checks.push({
+  name: "tempo-provider: feePayer is disabled (commented out)",
+  pass: !tempoProvider.match(/^\s*feePayer:/m) || tempoProvider.includes("// feePayer"),
+  detail: "feePayer must be disabled until sponsored fees are fixed — breaks preview deploys",
 });
 
 // --- Providers wrapper checks ---

@@ -14,8 +14,10 @@ import { SigningStatus } from "./signing-status";
 import { StatusCards } from "./status-cards";
 import { RaceTrack } from "./race-track";
 import { ResultsTable } from "./results-table";
-import { Zap, ArrowLeft } from "lucide-react";
+import { Zap, ArrowLeft, Check, Share2 } from "lucide-react";
 import confetti from "canvas-confetti";
+import { SponsorToggle } from "./sponsor-toggle";
+import type { RaceResult } from "@/types";
 
 const CONFETTI_CONFIG = {
   particleCount: 150,
@@ -45,23 +47,28 @@ export function RaceForm({
   tempoAddress,
   onBack,
   dryRun,
+  enabledChains,
 }: {
   allFunded: boolean;
   tempoAddress?: `0x${string}`;
   onBack?: () => void;
   dryRun?: boolean;
+  enabledChains?: Set<number>;
 }) {
   const { address } = useAccount();
   const { client: tempoClient } = useTempoWallet();
   const [recipient, setRecipient] = useState("");
   const [amount] = useState("1");
   const [memo] = useState("Invoice #1042 \u2014 Demo Payment");
+  const [sponsored, setSponsored] = useState(false);
+  const [raceError, setRaceError] = useState<string | null>(null);
   const [racing, setRacing] = useState(false);
-  const [phase, setPhase] = useState<"idle" | "signing" | "racing" | "done">(
-    "idle"
-  );
-  const [raceError, setRaceError] = useState<string>();
+  const [phase, setPhase] = useState<
+    "idle" | "signing" | "waiting" | "racing" | "done"
+  >("idle");
   const [chainStates, setChainStates] = useState(makeInitialStates);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const confettiFired = useRef(false);
 
   /** Handles state updates from the race engine for each chain */
@@ -71,6 +78,7 @@ export function RaceForm({
         ...prev,
         [chainId]: { ...prev[chainId], ...update },
       }));
+      if (update.state === "waiting") setPhase("waiting");
       if (update.state === "racing") setPhase("racing");
       // Fire confetti when Tempo wins — it should always confirm first
       if (
@@ -98,41 +106,103 @@ export function RaceForm({
     }
     setRacing(true);
     setPhase("signing");
-    setRaceError(undefined);
+    setRaceError(null);
     confettiFired.current = false;
     setChainStates(makeInitialStates());
+    let raceResults: ChainRaceState[] = [];
     try {
       // Dry run uses mock timing; real run uses actual wallet signing
       if (dryRun) {
-        await startDryRace({
+        raceResults = await startDryRace({
           recipient: (recipient || DRY_RUN_RECIPIENT) as `0x${string}`,
           amount,
           memo,
+          enabledChains,
+          sponsored,
           onUpdate: handleUpdate,
         });
       } else {
-        await startRace({
+        raceResults = await startRace({
           recipient: recipient as `0x${string}`,
           amount,
           memo,
           account: address!,
           tempoClient,
+          enabledChains,
+          sponsored,
           onUpdate: handleUpdate,
         });
       }
-      setPhase("done");
     } catch (err) {
-      // Signing failed or rejected — return to form with error message
-      const msg = err instanceof Error ? err.message : "Transaction failed";
-      // Extract short reason from verbose viem error
-      const reasonMatch = msg.match(/reason:\s*(.+?)(?:\n|$)/);
-      setRaceError(reasonMatch?.[1] ?? msg.split("\n")[0]);
-      setPhase("idle");
+      // Show error visually — don't swallow silently
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      setRaceError(msg);
+      console.error("[race] Error:", err);
     }
     setRacing(false);
+    setPhase("done");
+
+    // Auto-save using the returned results (not React state which hasn't re-rendered yet)
+    if (raceResults.length > 0) {
+      saveRaceResult(raceResults, recipient || DRY_RUN_RECIPIENT, amount, memo);
+    }
   };
 
-  const allDone = CHAIN_IDS.every(
+  /** Saves the completed race to the API and generates a share URL */
+  const saveRaceResult = async (
+    results: ChainRaceState[],
+    raceRecipient: string,
+    raceAmount: string,
+    raceMemo: string
+  ) => {
+    try {
+      const id = crypto.randomUUID().slice(0, 8);
+      const chains = results.map((cs) => ({
+        chainId: cs.chainId,
+        name: cs.name,
+        elapsedMs: cs.elapsedMs ?? 0,
+        feeDisplay: cs.feeDisplay ?? "",
+        feeToken: cs.feeToken ?? "",
+        hash: cs.hash ?? "",
+        state: (cs.state === "confirmed" ? "confirmed" : "error") as
+          | "confirmed"
+          | "error",
+        error: cs.error,
+      }));
+      const winner =
+        chains
+          .filter((c) => c.state === "confirmed")
+          .sort((a, b) => a.elapsedMs - b.elapsedMs)[0]?.name ?? "None";
+
+      const body: RaceResult = {
+        id,
+        timestamp: Date.now(),
+        chains,
+        winner,
+        recipient: raceRecipient,
+        amount: raceAmount,
+        memo: raceMemo,
+      };
+
+      const res = await fetch("/api/race", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      if (res.ok) {
+        setShareUrl(`${window.location.origin}/race/${id}`);
+      }
+    } catch {
+      // Non-critical — race completed even if save fails
+    }
+  };
+
+  // Only check enabled chains — disabled chains stay "idle" and should not block completion
+  const activeChains = enabledChains
+    ? CHAIN_IDS.filter((id) => enabledChains.has(id))
+    : CHAIN_IDS;
+  const allDone = activeChains.every(
     (id) =>
       chainStates[id]?.state === "confirmed" ||
       chainStates[id]?.state === "error"
@@ -151,12 +221,6 @@ export function RaceForm({
         </button>
       )}
 
-      {phase === "idle" && raceError && (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400 font-mono">
-          {raceError}
-        </div>
-      )}
-
       {phase === "idle" && (
         <PaymentForm
           recipient={recipient}
@@ -167,29 +231,80 @@ export function RaceForm({
           racing={racing}
           onStart={handleStart}
           tempoAddress={tempoAddress}
+          sponsored={sponsored}
+          setSponsored={setSponsored}
         />
       )}
       {isSigning && <SigningStatus chainStates={chainStates} />}
+
+      {/* Waiting for confirmations — all signed, collecting results before replay */}
+      {phase === "waiting" && (
+        <div className="flex flex-col items-center justify-center py-16 space-y-4">
+          <div className="w-8 h-8 border-2 border-[var(--tempo-primary)] border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-[var(--text-secondary)]">
+            Waiting for confirmations across all 3 chains...
+          </p>
+          <p className="text-xs text-[var(--text-dim)]">
+            Race replay starts once all transactions confirm
+          </p>
+        </div>
+      )}
+
+      {/* Error banner — shows the actual error instead of swallowing silently */}
+      {raceError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 space-y-1">
+          <p className="text-sm font-medium text-red-400">Race failed</p>
+          <p className="text-xs text-red-400/80 font-mono break-all">
+            {raceError}
+          </p>
+        </div>
+      )}
+
       {(isRacing || allDone) && <RaceTrack chainStates={chainStates} />}
       {isRacing && <StatusCards chainStates={chainStates} />}
       {allDone && <ResultsTable chainStates={chainStates} />}
+
+      {/* Share + Race Again buttons */}
       {allDone && (
-        <button
-          onClick={() => {
-            setChainStates(makeInitialStates());
-            setPhase("idle");
-            confettiFired.current = false;
-          }}
-          className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] font-mono text-xs uppercase tracking-wider h-10 transition-all"
-        >
-          Race Again
-        </button>
+        <div className="flex gap-3">
+          {shareUrl && (
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+              className="flex-1 rounded-xl border border-[var(--border-bright)] bg-[var(--bg-raised)] text-[var(--text-secondary)] hover:text-white text-sm font-medium h-10 transition-all flex items-center justify-center gap-2"
+            >
+              {copied ? (
+                <>
+                  <Check className="size-4 text-[var(--success)]" /> Link Copied
+                </>
+              ) : (
+                <>
+                  <Share2 className="size-4" /> Share Results
+                </>
+              )}
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setChainStates(makeInitialStates());
+              setPhase("idle");
+              setShareUrl(null);
+              confettiFired.current = false;
+            }}
+            className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--border-bright)] text-[var(--text-secondary)] text-sm font-medium h-10 transition-all"
+          >
+            Race Again
+          </button>
+        </div>
       )}
     </div>
   );
 }
 
-/** Compact single-row payment form with recipient, amount, and memo fields */
+/** Compact single-row payment form with recipient, amount, memo, and sponsor toggle */
 function PaymentForm({
   recipient,
   setRecipient,
@@ -199,6 +314,8 @@ function PaymentForm({
   racing,
   onStart,
   tempoAddress,
+  sponsored,
+  setSponsored,
 }: {
   recipient: string;
   setRecipient: (v: string) => void;
@@ -208,6 +325,8 @@ function PaymentForm({
   racing: boolean;
   onStart: () => void;
   tempoAddress?: `0x${string}`;
+  sponsored: boolean;
+  setSponsored: (v: boolean) => void;
 }) {
   return (
     <div className="space-y-3">
@@ -244,6 +363,10 @@ function PaymentForm({
           </div>
         </div>
       </div>
+
+      {/* Sponsor toggle — Tempo exclusive feature */}
+      <SponsorToggle sponsored={sponsored} setSponsored={setSponsored} />
+
       <button
         onClick={onStart}
         disabled={!allFunded || !recipient || racing}
@@ -261,3 +384,4 @@ function PaymentForm({
     </div>
   );
 }
+

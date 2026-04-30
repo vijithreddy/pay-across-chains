@@ -68,13 +68,17 @@ checks.push({
 checks.push({
   name: "race-engine: uses Actions.token.transfer for Tempo (not writeContract)",
   pass:
-    raceEngine.includes("Actions.token.transfer(tempoClient") ||
-    raceEngine.includes("Actions.token.transfer(tempoClient as any"),
+    raceEngine.includes("Actions.token.transfer") &&
+    !raceEngine.includes("writeContract(tempoClient"),
+  detail:
+    "May be type-cast wrapped: (Actions.token.transfer as ...)(client, ...)",
 });
 
 checks.push({
   name: "race-engine: uses writeContract for Eth/Base",
-  pass: raceEngine.includes("writeContract(config"),
+  pass:
+    raceEngine.includes("writeContract") && raceEngine.includes("config,"),
+  detail: "May be type-cast wrapped: (writeContract as ...)(config, ...)",
 });
 
 // --- Race form: passes tempoClient ---

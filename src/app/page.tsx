@@ -9,6 +9,8 @@ import { MigrationCards } from "@/components/migration-cards";
 import { TempoConnect } from "@/components/tempo-connect";
 import { useTempoWallet } from "@/components/tempo-provider";
 import { Zap } from "lucide-react";
+import { mainnet, base } from "wagmi/chains";
+import { tempo } from "viem/chains";
 import type { Tab } from "@/types";
 
 /** Main app page — routes between hero, funding checklist, race screen, and migration cards */
@@ -17,6 +19,10 @@ export default function Home() {
   const { address: tempoAddress } = useTempoWallet();
   const [allFunded, setAllFunded] = useState(false);
   const [raceStarted, setRaceStarted] = useState(false);
+  // Toggle chains on/off — Tempo always on, Eth/Base can be disabled to save gas
+  const [enabledChains, setEnabledChains] = useState<Set<number>>(
+    () => new Set([mainnet.id, base.id, tempo.id])
+  );
   const [activeTab, setActiveTab] = useState<Tab>("race");
   // useSyncExternalStore: false on server, true on client — no cascading renders
   const mounted = useSyncExternalStore(
@@ -162,6 +168,17 @@ export default function Home() {
                 <FundingChecklist
                   onAllFunded={setAllFunded}
                   tempoAddress={tempoAddress}
+                  enabledChains={enabledChains}
+                  onToggleChain={(chainId) => {
+                    // Tempo cannot be disabled — it's the whole point
+                    if (chainId === tempo.id) return;
+                    setEnabledChains((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(chainId)) next.delete(chainId);
+                      else next.add(chainId);
+                      return next;
+                    });
+                  }}
                 />
                 {allFunded && bothConnected && (
                   <button
@@ -189,6 +206,7 @@ export default function Home() {
                   tempoAddress={tempoAddress}
                   onBack={() => setRaceStarted(false)}
                   dryRun={dryRun}
+                  enabledChains={enabledChains}
                 />
               </div>
             </div>

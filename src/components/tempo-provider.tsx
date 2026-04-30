@@ -57,6 +57,8 @@ export function TempoProvider({ children }: { children: ReactNode }) {
         dialog: isLocalhost ? Dialog.popup() : Dialog.iframe(),
       }),
       chains: [tempo],
+      // TODO: re-enable when sponsored fees are fixed
+      // feePayer: "/api/relay",
     });
 
     const provider = providerRef.current;
